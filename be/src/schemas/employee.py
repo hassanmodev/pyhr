@@ -4,6 +4,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, EmailStr, field_validator
 
 from src.models.employee import EmployeeStatus
+from src.models.user import UserRole
 
 _MOBILE_RE = re.compile(r"^\+?[\d\s()\-\.]{7,30}$")
 
@@ -29,6 +30,7 @@ class EmployeeCreate(BaseModel):
     department_id: int | None = None
     company_id: int
     password: str
+    role: UserRole = UserRole.EMPLOYEE
 
     @field_validator("mobile")
     @classmethod
@@ -47,6 +49,7 @@ class EmployeeUpdate(BaseModel):
     status: EmployeeStatus | None = None
     department_id: int | None = None
     company_id: int | None = None
+    role: UserRole | None = None
 
     @field_validator("mobile")
     @classmethod
@@ -70,5 +73,6 @@ class EmployeeOut(BaseModel):
     company_name: str
     days_employed: int
     created_at: datetime
+    user_role: UserRole | None = None
 
     model_config = {"from_attributes": True}

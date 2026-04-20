@@ -3,7 +3,7 @@ import { Plus, Pencil, Trash2, Users, X, Search } from 'lucide-react';
 import { Navigate, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   getEmployees, createEmployee, updateEmployee, deleteEmployee,
-  type EmployeeOut, type EmployeeCreate, type EmployeeUpdate,
+  type EmployeeOut, type EmployeeCreate, type EmployeeUpdate, type UserRole,
 } from '../api/employees';
 import { getCompanies, type CompanyOut } from '../api/companies';
 import { getDepartments, type DeptOut } from '../api/departments';
@@ -20,9 +20,22 @@ function apiError(err: unknown) {
 
 const todayStr = () => new Date().toISOString().split('T')[0];
 
+const ROLE_LABEL: Record<UserRole, string> = {
+  employee: 'Employee',
+  hr_manager: 'HR Manager',
+  system_admin: 'System Admin',
+};
+
+function assignableRoles(actor: UserRole | undefined): UserRole[] {
+  if (actor === 'system_admin') return ['employee', 'hr_manager', 'system_admin'];
+  if (actor === 'hr_manager') return ['employee', 'hr_manager'];
+  return [];
+}
+
 export function Employees() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'system_admin';
+  const rolesForMe = assignableRoles(user?.role);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -122,6 +135,7 @@ export function Employees() {
       department_id: undefined,
       company_id: defaultCompanyId,
       password: '',
+      role: 'employee',
     });
     setFormError('');
     setModal({ type: 'create' });
@@ -139,6 +153,7 @@ export function Employees() {
       status: emp.status,
       department_id: emp.department_id || undefined,
       company_id: emp.company_id,
+      role: (emp.user_role ?? 'employee') as UserRole,
     });
     setFormError('');
     setModal({ type: 'edit', emp });
@@ -165,12 +180,17 @@ export function Employees() {
     if (!hireDate) { setFormError('Hire date is required.'); return; }
     if (!companyId) { setFormError('Company is required.'); return; }
     if (modal?.type === 'create' && !password) { setFormError('Password is required for new employees.'); return; }
+    const role = formData.role as UserRole | undefined;
+    if (role && !rolesForMe.includes(role)) { setFormError('You cannot assign that role.'); return; }
 
     setSaving(true);
     setFormError('');
     try {
       if (modal?.type === 'create') {
-        const created = await createEmployee(formData as EmployeeCreate);
+        const created = await createEmployee({
+          ...(formData as EmployeeCreate),
+          role: (formData.role ?? 'employee') as UserRole,
+        });
         setEmployees(prev => [...prev, created].sort((a, b) => a.last_name.localeCompare(b.last_name)));
       } else if (modal?.type === 'edit') {
         const updateData: EmployeeUpdate = {
@@ -185,6 +205,9 @@ export function Employees() {
           department_id: formData.department_id,
         };
         if (isAdmin) updateData.company_id = formData.company_id;
+        const locked =
+          !isAdmin && modal.emp.user_role === 'system_admin';
+        if (!locked) updateData.role = (formData.role ?? modal.emp.user_role ?? 'employee') as UserRole;
         const updated = await updateEmployee(modal.emp.id, updateData);
         setEmployees(prev => prev.map(e => e.id === updated.id ? updated : e));
       }
@@ -223,6 +246,9 @@ export function Employees() {
   if (user?.role === 'employee') {
     return <Navigate to="/" replace />;
   }
+
+  const roleLocked =
+    modal?.type === 'edit' && !isAdmin && modal.emp.user_role === 'system_admin';
 
   return (
     <div className="max-w-5xl">
@@ -331,6 +357,7 @@ export function Employees() {
               <tr className="border-b border-border">
                 <th className="text-left text-xs text-text-muted font-medium px-4 py-3">Name</th>
                 <th className="text-left text-xs text-text-muted font-medium px-4 py-3">Title</th>
+                <th className="text-left text-xs text-text-muted font-medium px-4 py-3">Role</th>
                 {isAdmin && (
                   <th className="text-left text-xs text-text-muted font-medium px-4 py-3">Company</th>
                 )}
@@ -351,6 +378,9 @@ export function Employees() {
                     <div className="text-xs text-text-muted">{emp.email}</div>
                   </td>
                   <td className="px-4 py-3 text-text-muted">{emp.title}</td>
+                  <td className="px-4 py-3 text-text-muted">
+                    {emp.user_role ? ROLE_LABEL[emp.user_role] : '—'}
+                  </td>
                   {isAdmin && (
                     <td className="px-4 py-3 text-text-muted">{getCompanyName(emp.company_id)}</td>
                   )}
@@ -540,6 +570,30 @@ export function Employees() {
                   ))}
                 </select>
               </div>
+            </div>
+
+            <div>
+              <label className="block text-xs text-text-muted mb-1.5">Account role</label>
+              {roleLocked ? (
+                <p className="text-sm text-text-main py-2">
+                  {modal.emp.user_role ? ROLE_LABEL[modal.emp.user_role] : '—'}
+                </p>
+              ) : (
+                <select
+                  value={(formData.role as UserRole) || 'employee'}
+                  onChange={e => setFormData(prev => ({ ...prev, role: e.target.value as UserRole }))}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-text-main text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 transition cursor-pointer"
+                >
+                  {rolesForMe.map(r => (
+                    <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+                  ))}
+                </select>
+              )}
+              {!roleLocked && (
+                <p className="text-xs text-text-muted mt-1">
+                  You can assign roles up to your own level ({ROLE_LABEL[user?.role ?? 'employee']}).
+                </p>
+              )}
             </div>
 
             {/* Password - only for create */}

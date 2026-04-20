@@ -1,6 +1,9 @@
 import client from './client';
+import type { UserRole } from './auth';
 
 export type EmployeeStatus = 'active' | 'inactive';
+
+export type { UserRole };
 
 export interface EmployeeOut {
   id: number;
@@ -18,6 +21,7 @@ export interface EmployeeOut {
   company_name: string;
   days_employed: number;
   created_at: string;
+  user_role: UserRole | null;
 }
 
 export interface EmployeeCreate {
@@ -32,6 +36,7 @@ export interface EmployeeCreate {
   department_id?: number;
   company_id: number;
   password: string;
+  role: UserRole;
 }
 
 export interface EmployeeUpdate {
@@ -45,6 +50,7 @@ export interface EmployeeUpdate {
   status?: EmployeeStatus;
   department_id?: number;
   company_id?: number;
+  role?: UserRole;
 }
 
 export const getEmployees = (params?: { company_id?: number; department_id?: number; status?: string }) =>

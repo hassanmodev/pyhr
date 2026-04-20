@@ -14,6 +14,8 @@ if TYPE_CHECKING:
     from .department import Department
     from .user import User
 
+from .user import UserRole
+
 
 class EmployeeStatus(str, enum.Enum):
     ACTIVE = "active"
@@ -58,6 +60,11 @@ class Employee(Base, TimestampMixin):
     @property
     def company_name(self) -> str:
         return self.company.name
+
+    @property
+    def user_role(self) -> UserRole | None:
+        u = self.user
+        return u.role if u is not None else None
 
     def __repr__(self) -> str:
         return f"<Employee id={self.id} email={self.email!r} status={self.status}>"
