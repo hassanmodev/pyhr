@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Building2, Users, BookOpen, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import type { UserRole } from '../../api/auth';
 
 interface NavItem {
   to: string;
@@ -16,9 +17,21 @@ const ADMIN_NAV: NavItem[] = [
   { to: '/employees', icon: Users, label: 'Employees' },
 ];
 
+const HR_NAV: NavItem[] = [
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', end: true },
+  { to: '/departments', icon: BookOpen, label: 'Departments' },
+  { to: '/employees', icon: Users, label: 'Employees' },
+];
+
+const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
+  system_admin: ADMIN_NAV,
+  hr_manager: HR_NAV,
+  employee: [],
+};
+
 export function Sidebar() {
   const { user, logout } = useAuth();
-  const items = ADMIN_NAV;
+  const items = user ? NAV_BY_ROLE[user.role] : [];
 
   return (
     <aside className="w-56 shrink-0 flex flex-col bg-surface border-r border-border">

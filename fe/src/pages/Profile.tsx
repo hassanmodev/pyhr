@@ -43,7 +43,9 @@ export function Profile() {
 
   return (
     <div className="max-w-md">
-      <h2 className="text-xl font-medium text-text-main mb-6">My Profile</h2>
+      <div className="mb-6">
+        <h2 className="text-xl font-medium text-text-main">My Profile</h2>
+      </div>
 
       <div className="bg-surface border border-border rounded-xl p-6">
         {/* Header */}
