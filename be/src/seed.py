@@ -17,8 +17,8 @@ from datetime import date
 import bcrypt
 from sqlalchemy.orm import Session
 
-from database import SessionLocal, engine
-from models import Base, Company, Department, Employee, EmployeeStatus, User, UserRole
+from src.database import SessionLocal, engine
+from src.models import Base, Company, Department, Employee, EmployeeStatus, User, UserRole
 
 # ---------------------------------------------------------------------------
 # Seed data
