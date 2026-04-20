@@ -69,10 +69,10 @@ class EmployeeOut(BaseModel):
     hire_date: date
     status: EmployeeStatus
     department_id: int | None
-    company_id: int
+    company_id: int | None
     company_name: str
     days_employed: int
     created_at: datetime
-    user_role: UserRole | None = None
+    role: UserRole
 
     model_config = {"from_attributes": True}

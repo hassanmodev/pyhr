@@ -17,11 +17,11 @@ export interface EmployeeOut {
   hire_date: string;
   status: EmployeeStatus;
   department_id: number | null;
-  company_id: number;
+  company_id: number | null;
   company_name: string;
   days_employed: number;
   created_at: string;
-  user_role: UserRole | null;
+  role: UserRole;
 }
 
 export interface EmployeeCreate {

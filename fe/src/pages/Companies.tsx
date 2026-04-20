@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Plus, Pencil, Trash2, Building2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -18,6 +18,7 @@ function apiError(err: unknown) {
 
 export function Companies() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [companies, setCompanies] = useState<CompanyOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -137,7 +138,9 @@ export function Companies() {
               {companies.map((c, i) => (
                 <tr
                   key={c.id}
-                  className={`${i < companies.length - 1 ? 'border-b border-border' : ''} hover:bg-surface-hover transition-colors`}
+                  onClick={() => navigate(`/departments?company_id=${c.id}`)}
+                  className={`${i < companies.length - 1 ? 'border-b border-border' : ''} hover:bg-surface-hover transition-colors cursor-pointer`}
+                  title="View departments for this company"
                 >
                   <td className="px-4 py-3 font-medium text-text-main">{c.name}</td>
                   <td className="px-4 py-3 text-right text-text-muted">{c.total_departments}</td>
@@ -148,14 +151,14 @@ export function Companies() {
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
                       <button
-                        onClick={() => openEdit(c)}
+                        onClick={(e) => { e.stopPropagation(); openEdit(c); }}
                         className="p-1 text-text-muted hover:text-text-main transition-colors cursor-pointer"
                         title="Edit"
                       >
                         <Pencil size={14} />
                       </button>
                       <button
-                        onClick={() => setConfirmDelete(c)}
+                        onClick={(e) => { e.stopPropagation(); setConfirmDelete(c); }}
                         className="p-1 text-text-muted hover:text-red-500 transition-colors cursor-pointer"
                         title="Delete"
                       >

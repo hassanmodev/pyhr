@@ -86,7 +86,10 @@ export function Employees() {
     load();
   }, [isAdmin, user?.role, filterCompanyId, filterDeptId]);
 
-  const getCompanyName = (id: number) => companies.find(c => c.id === id)?.name || `Company #${id}`;
+  const getCompanyName = (id: number | null) => {
+    if (id == null) return '—';
+    return companies.find(c => c.id === id)?.name || `Company #${id}`;
+  };
   const getDepartmentName = (id: number | null) => {
     if (!id) return '-';
     return departments.find(d => d.id === id)?.name || `Dept #${id}`;
@@ -152,8 +155,8 @@ export function Employees() {
       hire_date: emp.hire_date,
       status: emp.status,
       department_id: emp.department_id || undefined,
-      company_id: emp.company_id,
-      role: (emp.user_role ?? 'employee') as UserRole,
+      company_id: emp.company_id ?? undefined,
+      role: emp.role,
     });
     setFormError('');
     setModal({ type: 'edit', emp });
@@ -206,8 +209,8 @@ export function Employees() {
         };
         if (isAdmin) updateData.company_id = formData.company_id;
         const locked =
-          !isAdmin && modal.emp.user_role === 'system_admin';
-        if (!locked) updateData.role = (formData.role ?? modal.emp.user_role ?? 'employee') as UserRole;
+          !isAdmin && modal.emp.role === 'system_admin';
+        if (!locked) updateData.role = (formData.role ?? modal.emp.role) as UserRole;
         const updated = await updateEmployee(modal.emp.id, updateData);
         setEmployees(prev => prev.map(e => e.id === updated.id ? updated : e));
       }
@@ -248,7 +251,7 @@ export function Employees() {
   }
 
   const roleLocked =
-    modal?.type === 'edit' && !isAdmin && modal.emp.user_role === 'system_admin';
+    modal?.type === 'edit' && !isAdmin && modal.emp.role === 'system_admin';
 
   return (
     <div className="max-w-5xl">
@@ -379,10 +382,23 @@ export function Employees() {
                   </td>
                   <td className="px-4 py-3 text-text-muted">{emp.title}</td>
                   <td className="px-4 py-3 text-text-muted">
-                    {emp.user_role ? ROLE_LABEL[emp.user_role] : '—'}
+                    {ROLE_LABEL[emp.role]}
                   </td>
                   {isAdmin && (
-                    <td className="px-4 py-3 text-text-muted">{getCompanyName(emp.company_id)}</td>
+                    <td className="px-4 py-3">
+                      {emp.company_id != null ? (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/employees?company_id=${emp.company_id}`)}
+                          className="text-left text-text-muted hover:text-primary-600 hover:underline cursor-pointer"
+                          title="Filter by this company"
+                        >
+                          {getCompanyName(emp.company_id)}
+                        </button>
+                      ) : (
+                        <span className="text-text-muted">—</span>
+                      )}
+                    </td>
                   )}
                   <td className="px-4 py-3 text-text-muted">{getDepartmentName(emp.department_id)}</td>
                   <td className="px-4 py-3">{statusBadge(emp.status)}</td>
@@ -576,7 +592,7 @@ export function Employees() {
               <label className="block text-xs text-text-muted mb-1.5">Account role</label>
               {roleLocked ? (
                 <p className="text-sm text-text-main py-2">
-                  {modal.emp.user_role ? ROLE_LABEL[modal.emp.user_role] : '—'}
+                  {ROLE_LABEL[modal.emp.role]}
                 </p>
               ) : (
                 <select

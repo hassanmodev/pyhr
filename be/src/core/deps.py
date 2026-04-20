@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 
 from src.core.security import decode_access_token
 from src.database import get_db
-from src.models.user import User, UserRole
+from src.models.employee import Employee
+from src.models.user import UserRole
 
 _bearer = HTTPBearer()
 
@@ -15,7 +16,7 @@ _bearer = HTTPBearer()
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(_bearer),
     db: Session = Depends(get_db),
-) -> User:
+) -> Employee:
     token = credentials.credentials
     try:
         payload = decode_access_token(token)
@@ -24,14 +25,14 @@ def get_current_user(
     except jwt.PyJWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-    user = db.get(User, int(payload["sub"]))
-    if not user or not user.is_active:
+    emp = db.get(Employee, int(payload["sub"]))
+    if not emp or not emp.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-    return user
+    return emp
 
 
 def require_roles(*roles: UserRole) -> Callable:
-    def dependency(current_user: User = Depends(get_current_user)) -> User:
+    def dependency(current_user: Employee = Depends(get_current_user)) -> Employee:
         if current_user.role not in roles:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
         return current_user

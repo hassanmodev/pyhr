@@ -1,6 +1,6 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { Plus, Pencil, Trash2, Building2, Users } from 'lucide-react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { useEffect, useState, type FormEvent, type MouseEvent } from 'react';
+import { Plus, Pencil, Trash2, Building2, Users, X } from 'lucide-react';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   getDepartments, createDepartment, updateDepartment, deleteDepartment,
   type DeptOut,
@@ -21,6 +21,12 @@ export function Departments() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'system_admin';
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterCompanyIdRaw = searchParams.get('company_id');
+  const filterCompanyId =
+    filterCompanyIdRaw != null && filterCompanyIdRaw !== '' && !Number.isNaN(Number(filterCompanyIdRaw))
+      ? Number(filterCompanyIdRaw)
+      : null;
 
   const [departments, setDepartments] = useState<DeptOut[]>([]);
   const [companies, setCompanies] = useState<CompanyOut[]>([]);
@@ -45,7 +51,7 @@ export function Departments() {
       try {
         const loadCompanies = isAdmin || user?.role === 'hr_manager';
         const [depts, comps] = await Promise.all([
-          getDepartments(),
+          getDepartments(filterCompanyId ?? undefined),
           loadCompanies ? getCompanies() : Promise.resolve([]),
         ]);
         setDepartments(depts);
@@ -57,7 +63,7 @@ export function Departments() {
       }
     };
     load();
-  }, [isAdmin, user?.role]);
+  }, [isAdmin, user?.role, filterCompanyId]);
 
   const getCompanyName = (id: number) => companies.find(c => c.id === id)?.name || `Company #${id}`;
 
@@ -66,9 +72,25 @@ export function Departments() {
     navigate(`/employees?company_id=${dept.company_id}&department_id=${dept.id}`);
   };
 
+  const viewCompanyEmployees = (e: MouseEvent, companyId: number) => {
+    e.stopPropagation();
+    if (!isAdmin) return;
+    navigate(`/employees?company_id=${companyId}`);
+  };
+
   const openCreate = () => {
     setNameInput('');
-    setCompanyIdInput(isAdmin ? (companies[0]?.id ?? '') : (user?.company_id ?? ''));
+    const fromFilter =
+      isAdmin && filterCompanyId != null && companies.some(c => c.id === filterCompanyId)
+        ? filterCompanyId
+        : '';
+    setCompanyIdInput(
+      fromFilter !== ''
+        ? fromFilter
+        : isAdmin
+          ? (companies[0]?.id ?? '')
+          : (user?.company_id ?? ''),
+    );
     setFormError('');
     setModal({ type: 'create' });
   };
@@ -134,6 +156,23 @@ export function Departments() {
         <div>
           <h2 className="text-xl font-medium text-text-main">Departments</h2>
           <p className="text-sm text-text-muted mt-0.5">{departments.length} total</p>
+          {filterCompanyId != null && (
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700">
+                Company: {companies.find(c => c.id === filterCompanyId)?.name || `#${filterCompanyId}`}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchParams({});
+                  }}
+                  className="ml-1 hover:text-blue-900 transition-colors cursor-pointer"
+                  title="Remove company filter"
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            </div>
+          )}
         </div>
         <button
           onClick={openCreate}
@@ -186,7 +225,16 @@ export function Departments() {
                 >
                   <td className="px-4 py-3 font-medium text-text-main">{d.name}</td>
                   {isAdmin && (
-                    <td className="px-4 py-3 text-text-muted">{getCompanyName(d.company_id)}</td>
+                    <td className="px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={e => viewCompanyEmployees(e, d.company_id)}
+                        className="text-left text-text-muted hover:text-primary-600 hover:underline cursor-pointer"
+                        title="View employees in this company"
+                      >
+                        {getCompanyName(d.company_id)}
+                      </button>
+                    </td>
                   )}
                   <td className="px-4 py-3 text-right">
                     <span className="inline-flex items-center gap-1 text-text-muted">

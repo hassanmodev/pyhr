@@ -18,7 +18,7 @@ import bcrypt
 from sqlalchemy.orm import Session
 
 from src.database import SessionLocal, engine
-from src.models import Base, Company, Department, Employee, EmployeeStatus, User, UserRole
+from src.models import Base, Company, Department, Employee, EmployeeStatus, UserRole
 
 # ---------------------------------------------------------------------------
 # Seed data
@@ -61,19 +61,40 @@ EMPLOYEES: dict[str, list[dict]] = {
     ],
 }
 
-# Non-employee users (admin + one HR manager per company)
-ADMIN_USERS = [
-    {
-        "email": "admin@pyhr.dev",
-        "password": "admin1234",
-        "role": UserRole.SYSTEM_ADMIN,
-        "company": None,
-    },
-]
+ADMIN_USER = {
+    "email": "admin@pyhr.dev",
+    "password": "admin1234",
+    "first_name": "System",
+    "last_name": "Administrator",
+    "mobile": "+0 000 000 0000",
+    "title": "System Administrator",
+    "hire_date": date(2020, 1, 1),
+    "role": UserRole.SYSTEM_ADMIN,
+}
 
 HR_USERS: list[dict] = [
-    {"email": "hr@cairotech.eg",  "password": "hr1234", "company": "CairoTech"},
-    {"email": "hr@alextrade.eg",  "password": "hr1234", "company": "AlexTrade"},
+    {
+        "email": "hr@cairotech.eg",
+        "password": "hr1234",
+        "company": "CairoTech",
+        "dept": "Human Resources",
+        "first_name": "HR",
+        "last_name": "Manager",
+        "mobile": "+20 10 1111 2222",
+        "title": "HR Manager",
+        "hire_date": date(2019, 1, 1),
+    },
+    {
+        "email": "hr@alextrade.eg",
+        "password": "hr1234",
+        "company": "AlexTrade",
+        "dept": "Operations",
+        "first_name": "HR",
+        "last_name": "Manager",
+        "mobile": "+20 10 2222 3333",
+        "title": "HR Manager",
+        "hire_date": date(2019, 2, 1),
+    },
 ]
 
 
@@ -109,43 +130,56 @@ def _get_or_create_department(db: Session, name: str, company: Company) -> Depar
     return obj
 
 
-def _get_or_create_employee(db: Session, data: dict, department: Department, company: Company) -> Employee:
+def _get_or_create_employee(
+    db: Session,
+    data: dict,
+    department: Department,
+    company: Company,
+    *,
+    password: str,
+    role: UserRole,
+) -> Employee:
     obj = db.query(Employee).filter_by(email=data["email"]).first()
     if not obj:
         obj = Employee(
-            **data,
+            first_name=data["first_name"],
+            last_name=data["last_name"],
+            email=data["email"],
+            mobile=data["mobile"],
+            title=data["title"],
+            hire_date=data["hire_date"],
             status=EmployeeStatus.ACTIVE,
             department=department,
             company=company,
+            password_hash=_hash(password),
+            role=role,
+            is_active=True,
         )
         db.add(obj)
         db.flush()
-        print(f"      + Employee: {data['first_name']} {data['last_name']} <{data['email']}>")
-
-        # Auto-provision user account
-        user = User(
-            email=data["email"],
-            password_hash=_hash("employee1234"),
-            role=UserRole.EMPLOYEE,
-            employee=obj,
-            company=company,
-        )
-        db.add(user)
-        print(f"        + User (employee): {data['email']}")
+        print(f"      + Employee ({role.value}): {data['first_name']} {data['last_name']} <{data['email']}>")
     return obj
 
 
-def _get_or_create_user(db: Session, email: str, password: str, role: UserRole, company: Company | None) -> User:
-    obj = db.query(User).filter_by(email=email).first()
+def _get_or_create_admin(db: Session, u: dict) -> Employee:
+    obj = db.query(Employee).filter_by(email=u["email"]).first()
     if not obj:
-        obj = User(
-            email=email,
-            password_hash=_hash(password),
-            role=role,
-            company=company,
+        obj = Employee(
+            first_name=u["first_name"],
+            last_name=u["last_name"],
+            email=u["email"],
+            mobile=u["mobile"],
+            title=u["title"],
+            hire_date=u["hire_date"],
+            status=EmployeeStatus.ACTIVE,
+            department_id=None,
+            company_id=None,
+            password_hash=_hash(u["password"]),
+            role=u["role"],
+            is_active=True,
         )
         db.add(obj)
-        print(f"  + User ({role.value}): {email}")
+        print(f"  + System admin: {u['email']}")
     return obj
 
 
@@ -155,7 +189,7 @@ def _get_or_create_user(db: Session, email: str, password: str, role: UserRole, 
 
 def reset(db: Session) -> None:
     print("Resetting tables …")
-    for model in (User, Employee, Department, Company):
+    for model in (Employee, Department, Company):
         count = db.query(model).delete()
         print(f"  Deleted {count} row(s) from {model.__tablename__}")
     db.commit()
@@ -178,19 +212,33 @@ def seed(db: Session) -> None:
             dept = _get_or_create_department(db, dept_name, company)
             dept_map[dept_name] = dept
 
-    print("\n── Employees & Employee Accounts ──")
+    print("\n── Employees ──")
     for dept_name, employees in EMPLOYEES.items():
         dept = dept_map[dept_name]
         for emp_data in employees:
-            _get_or_create_employee(db, emp_data, dept, dept.company)
+            _get_or_create_employee(db, emp_data, dept, dept.company, password="employee1234", role=UserRole.EMPLOYEE)
 
-    print("\n── Admin & HR Users ──")
-    for u in ADMIN_USERS:
-        _get_or_create_user(db, u["email"], u["password"], u["role"], company=None)
+    print("\n── Admin & HR ──")
+    _get_or_create_admin(db, ADMIN_USER)
 
     for u in HR_USERS:
         company = company_map[u["company"]]
-        _get_or_create_user(db, u["email"], u["password"], UserRole.HR_MANAGER, company)
+        dept = dept_map[u["dept"]]
+        _get_or_create_employee(
+            db,
+            {
+                "first_name": u["first_name"],
+                "last_name": u["last_name"],
+                "email": u["email"],
+                "mobile": u["mobile"],
+                "title": u["title"],
+                "hire_date": u["hire_date"],
+            },
+            dept,
+            company,
+            password=u["password"],
+            role=UserRole.HR_MANAGER,
+        )
 
     db.commit()
     print("\nSeed complete.")

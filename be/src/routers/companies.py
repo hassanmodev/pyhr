@@ -7,7 +7,7 @@ from src.database import get_db
 from src.models.company import Company
 from src.models.department import Department
 from src.models.employee import Employee, EmployeeStatus
-from src.models.user import User, UserRole
+from src.models.user import UserRole
 from src.schemas.company import CompanyCreate, CompanyOut, CompanyUpdate
 
 router = APIRouter(prefix="/companies", tags=["companies"])
@@ -50,7 +50,7 @@ def _fetch_stats(db: Session, company_ids: list[int]) -> tuple[dict, dict]:
 )
 def list_companies(
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: Employee = Depends(get_current_user),
 ):
     if user.role == UserRole.SYSTEM_ADMIN:
         companies = db.query(Company).order_by(Company.name).all()
@@ -78,7 +78,7 @@ def list_companies(
 def create_company(
     body: CompanyCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(_admin),
+    _: Employee = Depends(_admin),
 ):
     if db.query(Company).filter_by(name=body.name).first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Company name already exists")
@@ -97,7 +97,7 @@ def create_company(
 def get_company(
     company_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(_admin),
+    _: Employee = Depends(_admin),
 ):
     company = db.get(Company, company_id)
     if not company:
@@ -115,7 +115,7 @@ def update_company(
     company_id: int,
     body: CompanyUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(_admin),
+    _: Employee = Depends(_admin),
 ):
     company = db.get(Company, company_id)
     if not company:
@@ -144,7 +144,7 @@ def update_company(
 def delete_company(
     company_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(_admin),
+    _: Employee = Depends(_admin),
 ):
     company = db.get(Company, company_id)
     if not company:

@@ -7,7 +7,7 @@ from src.database import get_db
 from src.models.company import Company
 from src.models.department import Department
 from src.models.employee import Employee, EmployeeStatus
-from src.models.user import User, UserRole
+from src.models.user import UserRole
 from src.schemas.department import DeptCreate, DeptOut, DeptUpdate
 
 router = APIRouter(prefix="/departments", tags=["departments"])
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/departments", tags=["departments"])
 _admin_or_hr = require_roles(UserRole.SYSTEM_ADMIN, UserRole.HR_MANAGER)
 
 
-def _assert_company_scope(current_user: User, company_id: int) -> None:
+def _assert_company_scope(current_user: Employee, company_id: int) -> None:
     if current_user.role == UserRole.HR_MANAGER and current_user.company_id != company_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access restricted to your company")
 
@@ -54,7 +54,7 @@ def _active_counts(db: Session, dept_ids: list[int]) -> dict[int, int]:
 def list_departments(
     company_id: int | None = Query(default=None, description="Filter by company (admin only)"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(_admin_or_hr),
+    current_user: Employee = Depends(_admin_or_hr),
 ):
     q = db.query(Department)
     if current_user.role == UserRole.HR_MANAGER:
@@ -76,7 +76,7 @@ def list_departments(
 def create_department(
     body: DeptCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(_admin_or_hr),
+    current_user: Employee = Depends(_admin_or_hr),
 ):
     _assert_company_scope(current_user, body.company_id)
 
@@ -108,15 +108,14 @@ def create_department(
 def get_department(
     dept_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: Employee = Depends(get_current_user),
 ):
     dept = db.get(Department, dept_id)
     if not dept:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found")
 
     if current_user.role == UserRole.EMPLOYEE:
-        emp = current_user.employee_id and db.get(Employee, current_user.employee_id)
-        if not emp or emp.department_id != dept_id:
+        if current_user.department_id != dept_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access restricted to your own department")
     elif current_user.role == UserRole.HR_MANAGER:
         _assert_company_scope(current_user, dept.company_id)
@@ -134,7 +133,7 @@ def update_department(
     dept_id: int,
     body: DeptUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(_admin_or_hr),
+    current_user: Employee = Depends(_admin_or_hr),
 ):
     dept = db.get(Department, dept_id)
     if not dept:
@@ -169,7 +168,7 @@ def update_department(
 def delete_department(
     dept_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(_admin_or_hr),
+    current_user: Employee = Depends(_admin_or_hr),
 ):
     dept = db.get(Department, dept_id)
     if not dept:

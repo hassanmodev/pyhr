@@ -8,7 +8,7 @@ from src.database import get_db
 from src.models.company import Company
 from src.models.department import Department
 from src.models.employee import Employee
-from src.models.user import User, UserRole
+from src.models.user import UserRole
 from src.schemas.employee import EmployeeCreate, EmployeeOut, EmployeeUpdate
 
 router = APIRouter(prefix="/employees", tags=["employees"])
@@ -16,20 +16,26 @@ router = APIRouter(prefix="/employees", tags=["employees"])
 _admin_or_hr = require_roles(UserRole.SYSTEM_ADMIN, UserRole.HR_MANAGER)
 
 
-def _assert_company_scope(current_user: User, company_id: int) -> None:
+def _assert_company_scope(current_user: Employee, company_id: int | None) -> None:
+    if company_id is None:
+        if current_user.role != UserRole.SYSTEM_ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access restricted to system administrators",
+            )
+        return
     if current_user.role == UserRole.HR_MANAGER and current_user.company_id != company_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access restricted to your company")
 
 
-def _user_company_id_for_role(role: UserRole, employee_company_id: int) -> int | None:
+def _user_company_id_for_role(role: UserRole, employee_company_id: int | None) -> int | None:
     if role == UserRole.SYSTEM_ADMIN:
         return None
     return employee_company_id
 
 
-def _assert_dept_belongs_to_company(db: Session, department_id: int | None, company_id: int) -> None:
-    """Relational integrity: department must belong to the selected company."""
-    if department_id is None:
+def _assert_dept_belongs_to_company(db: Session, department_id: int | None, company_id: int | None) -> None:
+    if department_id is None or company_id is None:
         return
     dept = db.get(Department, department_id)
     if not dept:
@@ -45,24 +51,12 @@ def _assert_dept_belongs_to_company(db: Session, department_id: int | None, comp
     "/me",
     response_model=EmployeeOut,
     summary="Get own employee profile",
-    description="Accessible to any authenticated user with a linked employee record. "
-    "This is the primary endpoint for the Employee role.",
+    description="Returns the authenticated person's employee record (all roles).",
 )
 def get_my_profile(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: Employee = Depends(get_current_user),
 ):
-    if not current_user.employee_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No employee profile linked to this account")
-    employee = (
-        db.query(Employee)
-        .options(joinedload(Employee.user))
-        .filter(Employee.id == current_user.employee_id)
-        .one_or_none()
-    )
-    if not employee:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee profile not found")
-    return employee
+    return current_user
 
 
 @router.get(
@@ -77,9 +71,9 @@ def list_employees(
     department_id: int | None = Query(default=None, description="Filter by department"),
     status: str | None = Query(default=None, description="Filter by status: active | inactive"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(_admin_or_hr),
+    current_user: Employee = Depends(_admin_or_hr),
 ):
-    q = db.query(Employee).options(joinedload(Employee.user))
+    q = db.query(Employee).options(joinedload(Employee.company))
 
     if current_user.role == UserRole.HR_MANAGER:
         q = q.filter(Employee.company_id == current_user.company_id)
@@ -100,26 +94,23 @@ def list_employees(
     response_model=EmployeeOut,
     status_code=status.HTTP_201_CREATED,
     summary="Create an employee",
-    description="Creates the employee record and automatically provisions a User account "
-    "with the supplied `password`. The `department` must belong to the `company`.",
+    description="Creates one row with profile + login credentials.",
 )
 def create_employee(
     body: EmployeeCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(_admin_or_hr),
+    current_user: Employee = Depends(_admin_or_hr),
 ):
-    _assert_company_scope(current_user, body.company_id)
+    target_company_id = None if body.role == UserRole.SYSTEM_ADMIN else body.company_id
+    _assert_company_scope(current_user, target_company_id)
 
-    if not db.get(Company, body.company_id):
+    if target_company_id is not None and not db.get(Company, target_company_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
 
-    _assert_dept_belongs_to_company(db, body.department_id, body.company_id)
+    _assert_dept_belongs_to_company(db, body.department_id, target_company_id)
 
     if db.query(Employee).filter_by(email=body.email).first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already in use")
-
-    if db.query(User).filter_by(email=body.email).first():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A user account with this email already exists")
 
     assert_can_assign_role(current_user.role, body.role)
 
@@ -133,28 +124,20 @@ def create_employee(
         hire_date=body.hire_date,
         status=body.status,
         department_id=body.department_id,
-        company_id=body.company_id,
-    )
-    db.add(employee)
-    db.flush()
-
-    user = User(
-        email=body.email,
+        company_id=_user_company_id_for_role(body.role, target_company_id),
         password_hash=hash_password(body.password),
         role=body.role,
-        employee_id=employee.id,
-        company_id=_user_company_id_for_role(body.role, body.company_id),
+        is_active=True,
     )
-    db.add(user)
+    db.add(employee)
     db.commit()
     db.refresh(employee)
-    employee = (
+    return (
         db.query(Employee)
-        .options(joinedload(Employee.user))
+        .options(joinedload(Employee.company))
         .filter(Employee.id == employee.id)
         .one()
     )
-    return employee
 
 
 @router.get(
@@ -166,11 +149,11 @@ def create_employee(
 def get_employee(
     employee_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(_admin_or_hr),
+    current_user: Employee = Depends(_admin_or_hr),
 ):
     employee = (
         db.query(Employee)
-        .options(joinedload(Employee.user))
+        .options(joinedload(Employee.company))
         .filter(Employee.id == employee_id)
         .one_or_none()
     )
@@ -190,11 +173,11 @@ def update_employee(
     employee_id: int,
     body: EmployeeUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(_admin_or_hr),
+    current_user: Employee = Depends(_admin_or_hr),
 ):
     employee = (
         db.query(Employee)
-        .options(joinedload(Employee.user))
+        .options(joinedload(Employee.company))
         .filter(Employee.id == employee_id)
         .one_or_none()
     )
@@ -214,55 +197,39 @@ def update_employee(
     if body.email is not None and body.email != employee.email:
         if db.query(Employee).filter(Employee.email == body.email, Employee.id != employee_id).first():
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already in use")
-        # Keep user account email in sync
-        linked_user = db.query(User).filter_by(employee_id=employee_id).first()
-        if linked_user:
-            linked_user.email = body.email
 
     for field, value in payload.items():
         setattr(employee, field, value)
 
     if new_role is not None:
-        linked_user = employee.user or db.query(User).filter_by(employee_id=employee_id).first()
-        if not linked_user:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="No user account linked to this employee",
-            )
-        assert_may_set_user_role(current_user.role, linked_user.role, new_role)
-        linked_user.role = new_role
-        linked_user.company_id = _user_company_id_for_role(new_role, employee.company_id)
+        assert_may_set_user_role(current_user.role, employee.role, new_role)
+        employee.role = new_role
+        employee.company_id = _user_company_id_for_role(new_role, employee.company_id)
 
     db.commit()
     db.refresh(employee)
-    employee = (
+    return (
         db.query(Employee)
-        .options(joinedload(Employee.user))
+        .options(joinedload(Employee.company))
         .filter(Employee.id == employee_id)
         .one()
     )
-    return employee
 
 
 @router.delete(
     "/{employee_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete an employee",
-    description="Also removes the associated user account.",
 )
 def delete_employee(
     employee_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(_admin_or_hr),
+    current_user: Employee = Depends(_admin_or_hr),
 ):
     employee = db.get(Employee, employee_id)
     if not employee:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
     _assert_company_scope(current_user, employee.company_id)
-
-    linked_user = db.query(User).filter_by(employee_id=employee_id).first()
-    if linked_user:
-        db.delete(linked_user)
 
     db.delete(employee)
     db.commit()

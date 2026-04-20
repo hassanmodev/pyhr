@@ -2,7 +2,7 @@ from .base import Base, TimestampMixin
 from .company import Company
 from .department import Department
 from .employee import Employee, EmployeeStatus
-from .user import User, UserRole
+from .user import UserRole
 
 __all__ = [
     "Base",
@@ -11,6 +11,5 @@ __all__ = [
     "Department",
     "Employee",
     "EmployeeStatus",
-    "User",
     "UserRole",
 ]

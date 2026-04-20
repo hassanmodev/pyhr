@@ -61,7 +61,7 @@ Obtain a token via **POST /auth/login**.
             "name": "employees",
             "description": "Employee CRUD — **System Admin** (all companies) or "
             "**HR Manager** (own company only). "
-            "Creating an employee automatically provisions a User account. "
+            "Each person is one `employees` row (profile + login credentials). "
             "Each response includes auto-calculated `days_employed`.",
         },
     ],

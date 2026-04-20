@@ -4,7 +4,7 @@ import enum
 from datetime import date
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, Enum as SAEnum, ForeignKey, String, Text
+from sqlalchemy import Boolean, Date, Enum as SAEnum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin
@@ -12,7 +12,6 @@ from .base import Base, TimestampMixin
 if TYPE_CHECKING:
     from .company import Company
     from .department import Department
-    from .user import User
 
 from .user import UserRole
 
@@ -41,13 +40,17 @@ class Employee(Base, TimestampMixin):
     department_id: Mapped[int | None] = mapped_column(
         ForeignKey("departments.id", ondelete="SET NULL")
     )
-    company_id: Mapped[int] = mapped_column(
-        ForeignKey("companies.id", ondelete="RESTRICT"), nullable=False
+    company_id: Mapped[int | None] = mapped_column(
+        ForeignKey("companies.id", ondelete="RESTRICT"),
+        nullable=True,
     )
 
-    company: Mapped[Company] = relationship(back_populates="employees")
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[UserRole] = mapped_column(SAEnum(UserRole, name="userrole"), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    company: Mapped[Company | None] = relationship(back_populates="employees")
     department: Mapped[Department | None] = relationship(back_populates="employees")
-    user: Mapped[User | None] = relationship(back_populates="employee", uselist=False)
 
     @property
     def days_employed(self) -> int:
@@ -59,12 +62,9 @@ class Employee(Base, TimestampMixin):
 
     @property
     def company_name(self) -> str:
+        if self.company is None:
+            return ""
         return self.company.name
-
-    @property
-    def user_role(self) -> UserRole | None:
-        u = self.user
-        return u.role if u is not None else None
 
     def __repr__(self) -> str:
         return f"<Employee id={self.id} email={self.email!r} status={self.status}>"
