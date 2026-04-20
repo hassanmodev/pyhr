@@ -1,23 +1,53 @@
-import { useState } from 'react'
-import './App.css'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { Spinner } from './components/ui/Spinner';
+import { Login } from './pages/Login';
+import { Dashboard } from './pages/Dashboard';
+import { Profile } from './pages/Profile';
+import { Companies } from './pages/Companies';
+import { Departments } from './pages/Departments';
+import { Employees } from './pages/Employees';
+import { Layout } from './components/layout/Layout';
 
-function App() {
-  const [count, setCount] = useState(0)
+function HomepageRouter() {
+  const { user, isLoading } = useAuth();
 
-  return (
-    <section id="center">
-      <h1>pyhr</h1>
-      <p>
-        Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-      </p>
-      <button
-        className="counter"
-        onClick={() => setCount((count) => count + 1)}
-      >
-        Count is {count}
-      </button>
-    </section>
-  )
+  if (isLoading) return (
+    <div className="flex h-full items-center justify-center">
+      <Spinner className="w-5 h-5" />
+    </div>
+  );
+
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role === 'employee') return <Profile />;
+  return <Dashboard />;
 }
 
-export default App
+function AppContent() {
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+
+      <Route path="/" element={<Layout />}>
+        <Route index element={<HomepageRouter />} />
+        <Route path="companies" element={<Companies />} />
+        <Route path="departments" element={<Departments />} />
+        <Route path="employees" element={<Employees />} />
+      </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </Router>
+  );
+}
+
+export default App;
