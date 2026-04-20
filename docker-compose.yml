@@ -1,8 +1,11 @@
+# From repo root: copy .env.example to .env, then:
+#   docker compose up --build
+
 services:
   db:
     image: postgres:16-alpine
     env_file:
-      - .env
+      - ./.env
     ports:
       - "5430:5432"
     healthcheck:
@@ -12,17 +15,34 @@ services:
       retries: 5
 
   api:
-    build: .
+    build: ./be
     ports:
       - "8000:8000"
     command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
-      - ./src:/app/src
+      - ./be/src:/app/src
     env_file:
-      - .env
+      - ./.env
     environment:
       PYTHONUNBUFFERED: "1"
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     depends_on:
       db:
         condition: service_healthy
+
+  fe:
+    build: ./fe
+    ports:
+      - "5173:5173"
+    environment:
+      # Browser on the host calls the API via published port
+      VITE_API_URL: http://localhost:8000
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    volumes:
+      - ./fe:/app
+      - fe_node_modules:/app/node_modules
+    depends_on:
+      - api
+
+volumes:
+  fe_node_modules:
