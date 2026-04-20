@@ -20,7 +20,7 @@ function HomepageRouter() {
 
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'employee') return <Profile />;
-  return <Dashboard />;
+  return <Navigate to="/dashboard" replace />;
 }
 
 function AppContent() {
@@ -30,6 +30,7 @@ function AppContent() {
 
       <Route path="/" element={<Layout />}>
         <Route index element={<HomepageRouter />} />
+        <Route path="dashboard" element={<Dashboard />} />
         <Route path="companies" element={<Companies />} />
         <Route path="departments" element={<Departments />} />
         <Route path="employees" element={<Employees />} />

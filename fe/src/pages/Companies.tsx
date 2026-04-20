@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Plus, Pencil, Trash2, Building2 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import {
   getCompanies, createCompany, updateCompany, deleteCompany,
   type CompanyOut,
@@ -15,6 +17,7 @@ function apiError(err: unknown) {
 }
 
 export function Companies() {
+  const { user } = useAuth();
   const [companies, setCompanies] = useState<CompanyOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -28,11 +31,15 @@ export function Companies() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
+    if (user?.role !== 'system_admin') {
+      setLoading(false);
+      return;
+    }
     getCompanies()
       .then(setCompanies)
       .catch(() => setError('Failed to load companies.'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [user?.role]);
 
   const openCreate = () => { setNameInput(''); setFormError(''); setModal({ type: 'create' }); };
   const openEdit = (c: CompanyOut) => { setNameInput(c.name); setFormError(''); setModal({ type: 'edit', company: c }); };
@@ -74,6 +81,10 @@ export function Companies() {
       setDeleting(false);
     }
   };
+
+  if (user?.role !== 'system_admin') {
+    return <Navigate to={user?.role === 'employee' ? '/' : '/dashboard'} replace />;
+  }
 
   return (
     <div className="max-w-3xl">

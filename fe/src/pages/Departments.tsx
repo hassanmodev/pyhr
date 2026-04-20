@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Plus, Pencil, Trash2, Building2, Users } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import {
   getDepartments, createDepartment, updateDepartment, deleteDepartment,
   type DeptOut,
@@ -37,11 +37,16 @@ export function Departments() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
+    if (user?.role === 'employee') {
+      setLoading(false);
+      return;
+    }
     const load = async () => {
       try {
+        const loadCompanies = isAdmin || user?.role === 'hr_manager';
         const [depts, comps] = await Promise.all([
           getDepartments(),
-          isAdmin ? getCompanies() : Promise.resolve([]),
+          loadCompanies ? getCompanies() : Promise.resolve([]),
         ]);
         setDepartments(depts);
         setCompanies(comps);
@@ -52,7 +57,7 @@ export function Departments() {
       }
     };
     load();
-  }, [isAdmin]);
+  }, [isAdmin, user?.role]);
 
   const getCompanyName = (id: number) => companies.find(c => c.id === id)?.name || `Company #${id}`;
 
@@ -117,6 +122,10 @@ export function Departments() {
       setDeleting(false);
     }
   };
+
+  if (user?.role === 'employee') {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className="max-w-3xl">

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, type FormEvent } from 'react';
 import { Plus, Pencil, Trash2, Users, X, Search } from 'lucide-react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Navigate, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   getEmployees, createEmployee, updateEmployee, deleteEmployee,
   type EmployeeOut, type EmployeeCreate, type EmployeeUpdate,
@@ -45,15 +45,20 @@ export function Employees() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
+    if (user?.role === 'employee') {
+      setLoading(false);
+      return;
+    }
     const load = async () => {
       try {
         const params: { company_id?: number; department_id?: number } = {};
         if (filterCompanyId) params.company_id = Number(filterCompanyId);
         if (filterDeptId) params.department_id = Number(filterDeptId);
 
+        const loadCompanies = isAdmin || user?.role === 'hr_manager';
         const [emps, comps, depts] = await Promise.all([
           getEmployees(Object.keys(params).length > 0 ? params : undefined),
-          isAdmin ? getCompanies() : Promise.resolve([]),
+          loadCompanies ? getCompanies() : Promise.resolve([]),
           getDepartments(),
         ]);
         setEmployees(emps);
@@ -66,7 +71,7 @@ export function Employees() {
       }
     };
     load();
-  }, [isAdmin, filterCompanyId, filterDeptId]);
+  }, [isAdmin, user?.role, filterCompanyId, filterDeptId]);
 
   const getCompanyName = (id: number) => companies.find(c => c.id === id)?.name || `Company #${id}`;
   const getDepartmentName = (id: number | null) => {
@@ -104,7 +109,7 @@ export function Employees() {
   };
 
   const openCreate = () => {
-    const defaultCompanyId = isAdmin ? companies[0]?.id : user?.company_id;
+    const defaultCompanyId = (isAdmin ? companies[0]?.id : user?.company_id) ?? undefined;
     setFormData({
       first_name: '',
       last_name: '',
@@ -214,6 +219,10 @@ export function Employees() {
       </span>
     );
   };
+
+  if (user?.role === 'employee') {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className="max-w-5xl">

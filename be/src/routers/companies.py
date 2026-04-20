@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from src.core.deps import require_roles
+from src.core.deps import get_current_user, require_roles
 from src.database import get_db
 from src.models.company import Company
 from src.models.department import Department
@@ -45,14 +45,23 @@ def _fetch_stats(db: Session, company_ids: list[int]) -> tuple[dict, dict]:
 @router.get(
     "/",
     response_model=list[CompanyOut],
-    summary="List all companies",
-    description="Returns every company with pre-computed department and employee totals.",
+    summary="List companies",
+    description="**System admin:** all companies. **HR manager:** their assigned company only.",
 )
 def list_companies(
     db: Session = Depends(get_db),
-    _: User = Depends(_admin),
+    user: User = Depends(get_current_user),
 ):
-    companies = db.query(Company).order_by(Company.name).all()
+    if user.role == UserRole.SYSTEM_ADMIN:
+        companies = db.query(Company).order_by(Company.name).all()
+    elif user.role == UserRole.HR_MANAGER:
+        if user.company_id is None:
+            return []
+        c = db.get(Company, user.company_id)
+        companies = [c] if c else []
+    else:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+
     if not companies:
         return []
     ids = [c.id for c in companies]

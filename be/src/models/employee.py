@@ -55,5 +55,9 @@ class Employee(Base, TimestampMixin):
     def full_name(self) -> str:
         return f"{self.first_name} {self.last_name}"
 
+    @property
+    def company_name(self) -> str:
+        return self.company.name
+
     def __repr__(self) -> str:
         return f"<Employee id={self.id} email={self.email!r} status={self.status}>"

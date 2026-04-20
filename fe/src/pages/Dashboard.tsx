@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Building2, Users, LayoutGrid } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getCompanies, type CompanyOut } from '../api/companies';
@@ -12,14 +13,24 @@ export function Dashboard() {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (user?.role === 'employee') {
+      setLoading(false);
+      return;
+    }
     getCompanies()
       .then(setCompanies)
       .catch(() => setError('Failed to load data.'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [user?.role]);
 
   const totalEmployees = companies.reduce((sum, c) => sum + c.total_employees, 0);
   const totalDepartments = companies.reduce((sum, c) => sum + c.total_departments, 0);
+
+  if (user?.role === 'employee') {
+    return <Navigate to="/" replace />;
+  }
+
+  const isAdmin = user?.role === 'system_admin';
 
   return (
     <div className="max-w-3xl">
@@ -38,9 +49,26 @@ export function Dashboard() {
         <p className="text-sm text-red-500">{error}</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <StatCard icon={Building2} label="Companies" value={companies.length} />
-          <StatCard icon={LayoutGrid} label="Departments" value={totalDepartments} iconClass="text-blue-400" />
-          <StatCard icon={Users} label="Employees" value={totalEmployees} iconClass="text-violet-400" />
+          <StatCard
+            icon={Building2}
+            label={isAdmin ? 'Companies' : (companies[0]?.name ?? 'Company')}
+            value={companies.length}
+            to={isAdmin ? '/companies' : undefined}
+          />
+          <StatCard
+            icon={LayoutGrid}
+            label="Departments"
+            value={totalDepartments}
+            iconClass="text-blue-400"
+            to="/departments"
+          />
+          <StatCard
+            icon={Users}
+            label="Employees"
+            value={totalEmployees}
+            iconClass="text-violet-400"
+            to="/employees"
+          />
         </div>
       )}
     </div>

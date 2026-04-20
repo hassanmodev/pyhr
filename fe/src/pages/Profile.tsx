@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { UserCircle, Calendar, Briefcase, Mail, Phone, MapPin, Clock } from 'lucide-react';
+import { UserCircle, Calendar, Briefcase, Mail, Phone, MapPin, Clock, Building2 } from 'lucide-react';
 import { getMyProfile, type EmployeeOut } from '../api/employees';
 import { Spinner } from '../components/ui/Spinner';
 
@@ -74,6 +74,7 @@ export function Profile() {
 
         {/* Details */}
         <div className="space-y-4">
+          <Row icon={Building2} label="Company" value={profile.company_name} />
           <Row icon={Mail} label="Email" value={profile.email} />
           <Row icon={Phone} label="Mobile" value={profile.mobile} />
           <Row icon={MapPin} label="Address" value={profile.address} />

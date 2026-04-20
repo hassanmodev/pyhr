@@ -67,6 +67,7 @@ class EmployeeOut(BaseModel):
     status: EmployeeStatus
     department_id: int | None
     company_id: int
+    company_name: str
     days_employed: int
     created_at: datetime
 

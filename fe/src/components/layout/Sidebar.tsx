@@ -1,7 +1,6 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Building2, Users, BookOpen, UserCircle, LogOut } from 'lucide-react';
+import { LayoutDashboard, Building2, Users, BookOpen, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import type { UserRole } from '../../api/auth';
 
 interface NavItem {
   to: string;
@@ -10,27 +9,16 @@ interface NavItem {
   end?: boolean;
 }
 
-const NAV_ITEMS: Record<UserRole, NavItem[]> = {
-  "system_admin": [
-    { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
-    { to: '/companies', icon: Building2, label: 'Companies' },
-    { to: '/departments', icon: BookOpen, label: 'Departments' },
-    { to: '/employees', icon: Users, label: 'Employees' },
-  ],
-  "hr_manager": [
-    { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
-    { to: '/departments', icon: BookOpen, label: 'Departments' },
-    { to: '/employees', icon: Users, label: 'Employees' },
-  ],
-  "employee": [
-    { to: '/', icon: UserCircle, label: 'My Profile', end: true },
-  ],
-};
+const ADMIN_NAV: NavItem[] = [
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', end: true },
+  { to: '/companies', icon: Building2, label: 'Companies' },
+  { to: '/departments', icon: BookOpen, label: 'Departments' },
+  { to: '/employees', icon: Users, label: 'Employees' },
+];
 
 export function Sidebar() {
   const { user, logout } = useAuth();
-  const items = user ? NAV_ITEMS[user.role] ?? [] : [];
-  console.log(user, 'user', items, 'items');
+  const items = ADMIN_NAV;
 
   return (
     <aside className="w-56 shrink-0 flex flex-col bg-surface border-r border-border">

@@ -15,6 +15,7 @@ export interface EmployeeOut {
   status: EmployeeStatus;
   department_id: number | null;
   company_id: number;
+  company_name: string;
   days_employed: number;
   created_at: string;
 }
