@@ -16,8 +16,8 @@ docker compose up --build -d
 | Service  | URL                                                      |
 | -------- | -------------------------------------------------------- |
 | Frontend | [http://localhost:5173](http://localhost:5173)           |
-| API      | [http://localhost:8000](http://localhost:8000)           |
-| API docs | [http://localhost:8000/docs](http://localhost:8000/docs) |
+| API      | [http://localhost:8005](http://localhost:8005)           |
+| API docs | [http://localhost:8005/docs](http://localhost:8005/docs) |
 
 
 ## Seeding data

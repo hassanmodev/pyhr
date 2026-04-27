@@ -17,8 +17,8 @@ services:
   api:
     build: ./be
     ports:
-      - "8000:8000"
-    command: flask --app src.main:app run --host 0.0.0.0 --port 8000 --reload
+      - "8005:8005"
+    command: flask --app src.main:app run --host 0.0.0.0 --port 8005 --reload
     volumes:
       - ./be/src:/app/src
     env_file:
@@ -36,7 +36,7 @@ services:
       - "5173:5173"
     environment:
       # Browser on the host calls the API via published port
-      VITE_API_URL: http://localhost:8000
+      VITE_API_URL: http://localhost:8005
     command: npm run dev -- --host 0.0.0.0 --port 5173
     volumes:
       - ./fe:/app
