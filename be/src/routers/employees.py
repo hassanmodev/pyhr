@@ -95,7 +95,27 @@ def _parse_status(status_str: str) -> EmployeeStatus:
 
 @bp.route("/me", methods=["GET"])
 def get_my_profile():
-    """Get own employee profile."""
+    """Full HR profile for the authenticated user (includes `days_employed`, names, role).
+    ---
+    tags:
+      - employees
+    summary: Get my employee profile
+    description: >
+      Same shape as admin/HR `GET /employees/{id}` but always for the caller.
+      Not to be confused with `GET /auth/me` (smaller auth-only payload).
+    security:
+      - Bearer: []
+    produces:
+      - application/json
+    responses:
+      200:
+        description: Full employee record
+        schema:
+          $ref: '#/definitions/EmployeeOut'
+      401:
+        schema:
+          $ref: '#/definitions/ApiError'
+    """
     current_user = get_current_user()
     db = get_db()
 
@@ -111,7 +131,54 @@ def get_my_profile():
 @bp.route("/", methods=["GET"])
 @require_roles(UserRole.SYSTEM_ADMIN, UserRole.HR_MANAGER)
 def list_employees():
-    """List employees. Admins see all employees. HR Managers see only their company's employees."""
+    """List employees (admin: optional filters; HR: always own company).
+    ---
+    tags:
+      - employees
+    summary: List employees
+    description: >
+      **HR manager:** results are always restricted to `company_id` of the caller;
+      `company_id` query is ignored.
+      **System admin:** optional `company_id` narrows the list.
+    security:
+      - Bearer: []
+    produces:
+      - application/json
+    parameters:
+      - in: query
+        name: company_id
+        type: integer
+        required: false
+        description: Filter by company (system admin only)
+      - in: query
+        name: department_id
+        type: integer
+        required: false
+        description: Filter by department id
+      - in: query
+        name: status
+        type: string
+        enum: [active, inactive]
+        required: false
+        description: Filter by employment status
+    responses:
+      200:
+        description: Array of employees
+        schema:
+          type: array
+          items:
+            $ref: '#/definitions/EmployeeOut'
+      401:
+        schema:
+          $ref: '#/definitions/ApiError'
+      403:
+        schema:
+          $ref: '#/definitions/ApiError'
+      422:
+        description: Invalid status filter
+        schema:
+          $ref: '#/definitions/ApiError'
+    """
     company_id = request.args.get("company_id", type=int)
     department_id = request.args.get("department_id", type=int)
     status = request.args.get("status")
@@ -143,7 +210,52 @@ def list_employees():
 @bp.route("/", methods=["POST"])
 @require_roles(UserRole.SYSTEM_ADMIN, UserRole.HR_MANAGER)
 def create_employee():
-    """Create an employee with login credentials."""
+    """Create an employee row (profile + hashed password + role).
+    ---
+    tags:
+      - employees
+    summary: Create employee
+    description: >
+      `department_id` must belong to the same `company_id` when both are set.
+      Creating a **system_admin** sets `company_id` / `department_id` to null;
+      only appropriate callers may assign that role (see RBAC in code).
+    security:
+      - Bearer: []
+    consumes:
+      - application/json
+    produces:
+      - application/json
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/EmployeeCreate'
+    responses:
+      201:
+        description: Created employee
+        schema:
+          $ref: '#/definitions/EmployeeOut'
+      401:
+        schema:
+          $ref: '#/definitions/ApiError'
+      403:
+        description: Company scope or role assignment denied
+        schema:
+          $ref: '#/definitions/ApiError'
+      404:
+        description: Company or department not found
+        schema:
+          $ref: '#/definitions/ApiError'
+      409:
+        description: Email already in use
+        schema:
+          $ref: '#/definitions/ApiError'
+      422:
+        description: Validation or department/company mismatch
+        schema:
+          $ref: '#/definitions/ApiError'
+    """
     data = request.get_json()
     if not data:
         abort(422, "Request body is required")
@@ -221,7 +333,35 @@ def create_employee():
 @bp.route("/<int:employee_id>", methods=["GET"])
 @require_roles(UserRole.SYSTEM_ADMIN, UserRole.HR_MANAGER)
 def get_employee(employee_id: int):
-    """Get an employee. Returns full profile including auto-calculated days_employed."""
+    """Get one employee by id (full profile including `days_employed`).
+    ---
+    tags:
+      - employees
+    summary: Get employee
+    security:
+      - Bearer: []
+    produces:
+      - application/json
+    parameters:
+      - in: path
+        name: employee_id
+        type: integer
+        required: true
+    responses:
+      200:
+        schema:
+          $ref: '#/definitions/EmployeeOut'
+      401:
+        schema:
+          $ref: '#/definitions/ApiError'
+      403:
+        description: Outside company scope (e.g. HR viewing other company)
+        schema:
+          $ref: '#/definitions/ApiError'
+      404:
+        schema:
+          $ref: '#/definitions/ApiError'
+    """
     current_user = get_current_user()
     db = get_db()
 
@@ -241,7 +381,51 @@ def get_employee(employee_id: int):
 @bp.route("/<int:employee_id>", methods=["PATCH"])
 @require_roles(UserRole.SYSTEM_ADMIN, UserRole.HR_MANAGER)
 def update_employee(employee_id: int):
-    """Update an employee."""
+    """Partial update of an employee (no password change in this endpoint).
+    ---
+    tags:
+      - employees
+    summary: Update employee
+    description: >
+      Send only fields to change. Changing `role` may clear `company_id` for
+      system_admin per server rules. Department must belong to the target company.
+    security:
+      - Bearer: []
+    consumes:
+      - application/json
+    produces:
+      - application/json
+    parameters:
+      - in: path
+        name: employee_id
+        type: integer
+        required: true
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/EmployeePatch'
+    responses:
+      200:
+        schema:
+          $ref: '#/definitions/EmployeeOut'
+      401:
+        schema:
+          $ref: '#/definitions/ApiError'
+      403:
+        schema:
+          $ref: '#/definitions/ApiError'
+      404:
+        schema:
+          $ref: '#/definitions/ApiError'
+      409:
+        description: Email conflict
+        schema:
+          $ref: '#/definitions/ApiError'
+      422:
+        schema:
+          $ref: '#/definitions/ApiError'
+    """
     data = request.get_json()
     if not data:
         abort(422, "Request body is required")
@@ -343,7 +527,31 @@ def update_employee(employee_id: int):
 @bp.route("/<int:employee_id>", methods=["DELETE"])
 @require_roles(UserRole.SYSTEM_ADMIN, UserRole.HR_MANAGER)
 def delete_employee(employee_id: int):
-    """Delete an employee."""
+    """Delete an employee row (removes login for that email).
+    ---
+    tags:
+      - employees
+    summary: Delete employee
+    security:
+      - Bearer: []
+    parameters:
+      - in: path
+        name: employee_id
+        type: integer
+        required: true
+    responses:
+      204:
+        description: No content — deleted
+      401:
+        schema:
+          $ref: '#/definitions/ApiError'
+      403:
+        schema:
+          $ref: '#/definitions/ApiError'
+      404:
+        schema:
+          $ref: '#/definitions/ApiError'
+    """
     current_user = get_current_user()
     db = get_db()
 

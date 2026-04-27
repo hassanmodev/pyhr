@@ -41,7 +41,34 @@ def _fetch_stats(db: Session, company_ids: list[int]) -> tuple[dict, dict]:
 
 @bp.route("/", methods=["GET"])
 def list_companies():
-    """List all companies. System admin: all companies. HR manager: their assigned company only."""
+    """List companies the caller may see (with department and active-employee counts).
+    ---
+    tags:
+      - companies
+    summary: List companies
+    description: >
+      **System admin:** every company. **HR manager:** only their `company_id`
+      (empty array if unassigned). **Employee:** 403.
+    security:
+      - Bearer: []
+    produces:
+      - application/json
+    responses:
+      200:
+        description: Array of companies (may be empty)
+        schema:
+          type: array
+          items:
+            $ref: '#/definitions/CompanyOut'
+      401:
+        description: Missing or invalid token
+        schema:
+          $ref: '#/definitions/ApiError'
+      403:
+        description: Insufficient permissions (e.g. employee role)
+        schema:
+          $ref: '#/definitions/ApiError'
+    """
     user = get_current_user()
     db = get_db()
 
@@ -66,7 +93,43 @@ def list_companies():
 @bp.route("/", methods=["POST"])
 @require_roles(UserRole.SYSTEM_ADMIN)
 def create_company():
-    """Create a new company."""
+    """Create a company (unique `name`).
+    ---
+    tags:
+      - companies
+    summary: Create company
+    security:
+      - Bearer: []
+    consumes:
+      - application/json
+    produces:
+      - application/json
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/CompanyCreate'
+    responses:
+      201:
+        description: Created
+        schema:
+          $ref: '#/definitions/CompanyOut'
+      401:
+        schema:
+          $ref: '#/definitions/ApiError'
+      403:
+        schema:
+          $ref: '#/definitions/ApiError'
+      409:
+        description: Company name already exists
+        schema:
+          $ref: '#/definitions/ApiError'
+      422:
+        description: Validation error (e.g. missing name)
+        schema:
+          $ref: '#/definitions/ApiError'
+    """
     data = request.get_json()
     if not data or "name" not in data:
         abort(422, "Name is required")
@@ -91,7 +154,36 @@ def create_company():
 @bp.route("/<int:company_id>", methods=["GET"])
 @require_roles(UserRole.SYSTEM_ADMIN)
 def get_company(company_id: int):
-    """Get a single company."""
+    """Get one company by id with aggregate stats.
+    ---
+    tags:
+      - companies
+    summary: Get company
+    security:
+      - Bearer: []
+    produces:
+      - application/json
+    parameters:
+      - in: path
+        name: company_id
+        type: integer
+        required: true
+    responses:
+      200:
+        description: OK
+        schema:
+          $ref: '#/definitions/CompanyOut'
+      401:
+        schema:
+          $ref: '#/definitions/ApiError'
+      403:
+        schema:
+          $ref: '#/definitions/ApiError'
+      404:
+        description: Company not found
+        schema:
+          $ref: '#/definitions/ApiError'
+    """
     db = get_db()
     company = db.get(Company, company_id)
     if not company:
@@ -104,7 +196,49 @@ def get_company(company_id: int):
 @bp.route("/<int:company_id>", methods=["PATCH"])
 @require_roles(UserRole.SYSTEM_ADMIN)
 def update_company(company_id: int):
-    """Update a company."""
+    """Update company fields (partial).
+    ---
+    tags:
+      - companies
+    summary: Update company
+    security:
+      - Bearer: []
+    consumes:
+      - application/json
+    produces:
+      - application/json
+    parameters:
+      - in: path
+        name: company_id
+        type: integer
+        required: true
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/CompanyPatch'
+    responses:
+      200:
+        description: Updated company
+        schema:
+          $ref: '#/definitions/CompanyOut'
+      401:
+        schema:
+          $ref: '#/definitions/ApiError'
+      403:
+        schema:
+          $ref: '#/definitions/ApiError'
+      404:
+        schema:
+          $ref: '#/definitions/ApiError'
+      409:
+        description: Name conflict
+        schema:
+          $ref: '#/definitions/ApiError'
+      422:
+        schema:
+          $ref: '#/definitions/ApiError'
+    """
     data = request.get_json()
     if not data:
         abort(422, "Request body is required")
@@ -138,7 +272,38 @@ def update_company(company_id: int):
 @bp.route("/<int:company_id>", methods=["DELETE"])
 @require_roles(UserRole.SYSTEM_ADMIN)
 def delete_company(company_id: int):
-    """Delete a company. Cascades to departments. Employees are blocked (FK RESTRICT) unless reassigned first."""
+    """Delete a company. Departments cascade; employees block delete (FK RESTRICT).
+    ---
+    tags:
+      - companies
+    summary: Delete company
+    description: >
+      If any employee still references this company, delete fails with 409
+      (`Cannot delete company with existing employees...`).
+    security:
+      - Bearer: []
+    parameters:
+      - in: path
+        name: company_id
+        type: integer
+        required: true
+    responses:
+      204:
+        description: No content — deleted
+      401:
+        schema:
+          $ref: '#/definitions/ApiError'
+      403:
+        schema:
+          $ref: '#/definitions/ApiError'
+      404:
+        schema:
+          $ref: '#/definitions/ApiError'
+      409:
+        description: Employees still assigned to this company
+        schema:
+          $ref: '#/definitions/ApiError'
+    """
     db = get_db()
     company = db.get(Company, company_id)
     if not company:

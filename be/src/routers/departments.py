@@ -49,8 +49,13 @@ def list_departments():
     tags:
       - departments
     summary: List departments
+    description: >
+      **HR manager:** always scoped to their company (`company_id` query ignored).
+      **System admin:** optional `company_id` filter.
     security:
       - Bearer: []
+    produces:
+      - application/json
     parameters:
       - in: query
         name: company_id
@@ -59,13 +64,17 @@ def list_departments():
         description: Filter by company (system admin only; ignored for HR managers)
     responses:
       200:
-        description: Departments with active employee counts
+        description: Each item includes `active_employee_count`
         schema:
           type: array
           items:
-            type: object
+            $ref: '#/definitions/DepartmentOut'
+      401:
+        schema:
+          $ref: '#/definitions/ApiError'
       403:
-        description: Forbidden
+        schema:
+          $ref: '#/definitions/ApiError'
     """
     company_id = request.args.get("company_id", type=int)
     current_user = get_current_user()
@@ -94,33 +103,38 @@ def create_department():
       - Bearer: []
     consumes:
       - application/json
+    produces:
+      - application/json
     parameters:
       - in: body
         name: body
         required: true
         schema:
-          type: object
-          required:
-            - name
-            - company_id
-          properties:
-            name:
-              type: string
-            company_id:
-              type: integer
+          $ref: '#/definitions/DepartmentCreate'
     responses:
       201:
-        description: Department created
+        description: Department created (`active_employee_count` starts at 0)
         schema:
-          type: object
+          $ref: '#/definitions/DepartmentOut'
+      401:
+        schema:
+          $ref: '#/definitions/ApiError'
       403:
-        description: Outside company scope
+        description: HR cannot create in another company
+        schema:
+          $ref: '#/definitions/ApiError'
       404:
         description: Company not found
+        schema:
+          $ref: '#/definitions/ApiError'
       409:
-        description: Duplicate name in company
+        description: Duplicate department name within the company
+        schema:
+          $ref: '#/definitions/ApiError'
       422:
         description: Validation error
+        schema:
+          $ref: '#/definitions/ApiError'
     """
     data = request.get_json()
     if not data or "name" not in data or "company_id" not in data:
@@ -163,8 +177,14 @@ def get_department(dept_id: int):
     tags:
       - departments
     summary: Get department
+    description: >
+      **Employee:** only if `dept_id` equals their `department_id`.
+      **HR manager:** only departments in their company.
+      **System admin:** any department.
     security:
       - Bearer: []
+    produces:
+      - application/json
     parameters:
       - in: path
         name: dept_id
@@ -174,11 +194,18 @@ def get_department(dept_id: int):
       200:
         description: Department with active employee count
         schema:
-          type: object
+          $ref: '#/definitions/DepartmentOut'
+      401:
+        schema:
+          $ref: '#/definitions/ApiError'
       403:
         description: Outside allowed scope
+        schema:
+          $ref: '#/definitions/ApiError'
       404:
         description: Department not found
+        schema:
+          $ref: '#/definitions/ApiError'
     """
     current_user = get_current_user()
     db = get_db()
@@ -209,6 +236,8 @@ def update_department(dept_id: int):
       - Bearer: []
     consumes:
       - application/json
+    produces:
+      - application/json
     parameters:
       - in: path
         name: dept_id
@@ -218,23 +247,29 @@ def update_department(dept_id: int):
         name: body
         required: true
         schema:
-          type: object
-          properties:
-            name:
-              type: string
+          $ref: '#/definitions/DepartmentPatch'
     responses:
       200:
         description: Updated department
         schema:
-          type: object
+          $ref: '#/definitions/DepartmentOut'
+      401:
+        schema:
+          $ref: '#/definitions/ApiError'
       403:
         description: Outside company scope
+        schema:
+          $ref: '#/definitions/ApiError'
       404:
-        description: Department not found
+        schema:
+          $ref: '#/definitions/ApiError'
       409:
-        description: Name conflict
+        description: Name conflict within company
+        schema:
+          $ref: '#/definitions/ApiError'
       422:
-        description: Validation error
+        schema:
+          $ref: '#/definitions/ApiError'
     """
     data = request.get_json()
     if not data:
@@ -282,6 +317,8 @@ def delete_department(dept_id: int):
     tags:
       - departments
     summary: Delete department
+    description: >
+      Employees in this department get `department_id` set to null (FK ON DELETE SET NULL).
     security:
       - Bearer: []
     parameters:
@@ -291,11 +328,17 @@ def delete_department(dept_id: int):
         required: true
     responses:
       204:
-        description: Deleted
+        description: No content — deleted
+      401:
+        schema:
+          $ref: '#/definitions/ApiError'
       403:
         description: Outside company scope
+        schema:
+          $ref: '#/definitions/ApiError'
       404:
-        description: Department not found
+        schema:
+          $ref: '#/definitions/ApiError'
     """
     current_user = get_current_user()
     db = get_db()

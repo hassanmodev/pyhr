@@ -2,6 +2,8 @@
 
 Small **HR / employee management** app: companies, departments, and employees with **JWT login** and **role-based access** (system admin, HR manager, employee). The UI is a React SPA; the API is **Flask** with PostgreSQL.
 
+**Interactive API docs** (Swagger UI, generated from route docstrings): [http://localhost:8005/apidocs](http://localhost:8005/apidocs) when the stack is up. Raw **Swagger 2.0 JSON**: [http://localhost:8005/apispec_1.json](http://localhost:8005/apispec_1.json). A written overview lives in [be/docs/API.md](be/docs/API.md).
+
 ## Running
 
 ```bash
@@ -13,17 +15,19 @@ docker compose up --build -d
 ```
 
 
-| Service  | URL                                                      |
-| -------- | -------------------------------------------------------- |
-| Frontend | [http://localhost:5173](http://localhost:5173)           |
-| API      | [http://localhost:8005](http://localhost:8005)           |
-| API docs | [http://localhost:8005/apidocs](http://localhost:8005/apidocs) |
+| Service  | URL |
+| -------- | --- |
+| Frontend | [http://localhost:5173](http://localhost:5173) |
+| API      | [http://localhost:8005](http://localhost:8005) |
+| API docs (Swagger UI) | [http://localhost:8005/apidocs](http://localhost:8005/apidocs) |
+| OpenAPI JSON (generated) | [http://localhost:8005/apispec_1.json](http://localhost:8005/apispec_1.json) |
 
 
 ## Backend docs
 
 | Doc | Contents |
 |-----|----------|
+| [be/docs/API.md](be/docs/API.md) | Auth, errors, route map, links to `/apidocs` and `/apispec_1.json` |
 | [be/docs/Database.md](be/docs/Database.md) | Schema, FK behaviour, enum types, seeding, computed fields |
 | [be/docs/entities.md](be/docs/entities.md) | Quick entity reference with column listings |
 

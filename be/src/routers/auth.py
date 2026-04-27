@@ -1,18 +1,52 @@
-from flask import Blueprint, abort, g, jsonify, request
-from sqlalchemy.orm import Session
+from flask import Blueprint, abort, jsonify, request
 
 from src.core.deps import get_current_user, get_db
 from src.core.security import create_access_token, verify_password
 from src.core.validation import validate_email
 from src.models.employee import Employee, EmployeeStatus
-from src.models.user import UserRole
 
 bp = Blueprint("auth", __name__)
 
 
 @bp.route("/login", methods=["POST"])
 def login():
-    """Authenticate and receive JWT token."""
+    """Authenticate with email and password; returns a JWT access token.
+    ---
+    tags:
+      - auth
+    summary: Login
+    description: >
+      No Bearer header. On success, use `access_token` as
+      `Authorization: Bearer <token>`. Returns 401 for wrong credentials;
+      403 if the account is disabled (`is_active` false or employment status inactive).
+    consumes:
+      - application/json
+    produces:
+      - application/json
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/LoginRequest'
+    responses:
+      200:
+        description: Token issued
+        schema:
+          $ref: '#/definitions/TokenResponse'
+      401:
+        description: Invalid credentials
+        schema:
+          $ref: '#/definitions/ApiError'
+      403:
+        description: Account disabled
+        schema:
+          $ref: '#/definitions/ApiError'
+      422:
+        description: Missing fields or invalid email
+        schema:
+          $ref: '#/definitions/ApiError'
+    """
     data = request.get_json()
     if not data or "email" not in data or "password" not in data:
         abort(422, "Email and password are required")
@@ -45,7 +79,28 @@ def login():
 
 @bp.route("/me", methods=["GET"])
 def me():
-    """Get current authenticated user profile."""
+    """Return the authenticated principal (id, email, role, company_id, is_active).
+    ---
+    tags:
+      - auth
+    summary: Current user (auth slice)
+    description: >
+      Lightweight identity — not the full HR profile. For full employee fields
+      including `days_employed`, use `GET /employees/me`.
+    security:
+      - Bearer: []
+    produces:
+      - application/json
+    responses:
+      200:
+        description: OK
+        schema:
+          $ref: '#/definitions/AuthMeOut'
+      401:
+        description: Missing or invalid token
+        schema:
+          $ref: '#/definitions/ApiError'
+    """
     current_user = get_current_user()
     return jsonify({
         "id": current_user.id,
