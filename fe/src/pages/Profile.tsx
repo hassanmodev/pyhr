@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { UserCircle, Calendar, Briefcase, Mail, Phone, MapPin, Clock, Building2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { UserCircle, Calendar, Briefcase, Mail, Phone, MapPin, Clock, Building2, Network } from 'lucide-react';
 import { getMyProfile, type EmployeeOut } from '../api/employees';
 import { Spinner } from '../components/ui/Spinner';
 
@@ -19,12 +20,13 @@ function Row({ icon: Icon, label, value }: { icon: typeof Mail; label: string; v
 export function Profile() {
   const [profile, setProfile] = useState<EmployeeOut | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     getMyProfile()
       .then(setProfile)
-      .catch(() => setError('Failed to load profile.'))
+      .catch(() => {
+        toast.error('Failed to load profile.');
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -34,7 +36,9 @@ export function Profile() {
     </div>
   );
 
-  if (error) return <p className="text-sm text-red-500">{error}</p>;
+  if (!loading && !profile) {
+    return <p className="text-sm text-text-muted">Couldn't load your profile. Try refreshing the page.</p>;
+  }
   if (!profile) return null;
 
   const hireDate = new Date(profile.hire_date).toLocaleDateString(undefined, {
@@ -77,6 +81,15 @@ export function Profile() {
         {/* Details */}
         <div className="space-y-4">
           <Row icon={Building2} label="Company" value={profile.company_name} />
+          <div className="flex items-start gap-3">
+            <Network size={14} className="text-text-muted mt-0.5 shrink-0" />
+            <div>
+              <p className="text-xs text-text-muted">Department</p>
+              <p className="text-sm text-text-main">
+                {profile.department_name?.trim() || 'Not assigned'}
+              </p>
+            </div>
+          </div>
           <Row icon={Mail} label="Email" value={profile.email} />
           <Row icon={Phone} label="Mobile" value={profile.mobile} />
           <Row icon={MapPin} label="Address" value={profile.address} />

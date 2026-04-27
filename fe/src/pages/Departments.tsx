@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent, type MouseEvent } from 'react';
+import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Building2, Users, X } from 'lucide-react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -31,7 +32,6 @@ export function Departments() {
   const [departments, setDepartments] = useState<DeptOut[]>([]);
   const [companies, setCompanies] = useState<CompanyOut[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   const [modal, setModal] = useState<ModalMode>(null);
   const [nameInput, setNameInput] = useState('');
@@ -57,7 +57,7 @@ export function Departments() {
         setDepartments(depts);
         setCompanies(comps);
       } catch {
-        setError('Failed to load departments.');
+        toast.error('Failed to load departments.');
       } finally {
         setLoading(false);
       }
@@ -118,13 +118,15 @@ export function Departments() {
       if (modal?.type === 'create') {
         const created = await createDepartment(name, companyId);
         setDepartments(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+        toast.success(`Created "${created.name}".`);
       } else if (modal?.type === 'edit') {
         const updated = await updateDepartment(modal.dept.id, name);
         setDepartments(prev => prev.map(d => d.id === updated.id ? updated : d));
+        toast.success('Department updated.');
       }
       setModal(null);
     } catch (err) {
-      setFormError(apiError(err));
+      toast.error(apiError(err));
     } finally {
       setSaving(false);
     }
@@ -134,12 +136,14 @@ export function Departments() {
     if (!confirmDelete) return;
     setDeleting(true);
     try {
+      const n = confirmDelete.name;
       await deleteDepartment(confirmDelete.id);
       setDepartments(prev => prev.filter(d => d.id !== confirmDelete.id));
       setConfirmDelete(null);
+      toast.success(`Deleted "${n}".`);
     } catch (err) {
       setConfirmDelete(null);
-      setError(apiError(err));
+      toast.error(apiError(err));
     } finally {
       setDeleting(false);
     }
@@ -182,11 +186,6 @@ export function Departments() {
           New department
         </button>
       </div>
-
-      {/* Error banner */}
-      {error && (
-        <p className="text-sm text-red-500 mb-4">{error}</p>
-      )}
 
       {/* List */}
       {loading ? (
@@ -332,8 +331,9 @@ export function Departments() {
           <p className="text-sm text-text-muted mb-5">
             Delete <strong className="text-text-main">{confirmDelete.name}</strong>? This cannot be undone.
             {confirmDelete.active_employee_count > 0 && (
-              <span className="block mt-1 text-red-500 text-xs">
-                This department has {confirmDelete.active_employee_count} active employee(s). Reassign them first.
+              <span className="block mt-1 text-amber-600 dark:text-amber-500 text-xs">
+                {confirmDelete.active_employee_count} active employee(s) here. Deleting this department
+                clears department on those rows (inactive employees in this department too).
               </span>
             )}
           </p>

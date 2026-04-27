@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Spinner } from '../components/ui/Spinner';
@@ -32,7 +33,6 @@ export function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeDemo, setActiveDemo] = useState<DemoKey | null>(null);
 
@@ -41,12 +41,10 @@ export function Login() {
     setEmail(d.email);
     setPassword(d.password);
     setActiveDemo(key);
-    setError('');
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
     try {
       const me = await login(email, password);
@@ -56,7 +54,7 @@ export function Login() {
         navigate('/dashboard', { replace: true });
       }
     } catch {
-      setError('Invalid email or password.');
+      toast.error('Invalid email or password.');
     } finally {
       setLoading(false);
     }
@@ -127,8 +125,6 @@ export function Login() {
               className="w-full px-3 py-2 rounded-lg border border-border bg-background text-text-main text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 transition"
             />
           </div>
-
-          {error && <p className="text-xs text-red-500">{error}</p>}
 
           <button
             type="submit"

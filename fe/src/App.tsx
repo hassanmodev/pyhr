@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Spinner } from './components/ui/Spinner';
 import { Login } from './pages/Login';
@@ -45,6 +46,12 @@ function App() {
   return (
     <Router>
       <AuthProvider>
+        <Toaster
+          position="top-right"
+          closeButton
+          richColors
+          toastOptions={{ className: 'font-sans' }}
+        />
         <AppContent />
       </AuthProvider>
     </Router>

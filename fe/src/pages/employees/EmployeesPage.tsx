@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, type FormEvent } from 'react';
+import { toast } from 'sonner';
 import { Navigate, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   getEmployees,
@@ -38,7 +39,6 @@ export function Employees() {
   const [companies, setCompanies] = useState<CompanyOut[]>([]);
   const [departments, setDepartments] = useState<DeptOut[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [searchText, setSearchText] = useState('');
 
   const [modal, setModal] = useState<ModalMode>(null);
@@ -70,7 +70,7 @@ export function Employees() {
         setCompanies(comps);
         setDepartments(depts);
       } catch {
-        setError('Failed to load employees.');
+        toast.error('Failed to load employees.');
       } finally {
         setLoading(false);
       }
@@ -82,9 +82,10 @@ export function Employees() {
     if (id == null) return '—';
     return companies.find(c => c.id === id)?.name || `Company #${id}`;
   };
-  const getDepartmentName = (id: number | null) => {
-    if (!id) return '-';
-    return departments.find(d => d.id === id)?.name || `Dept #${id}`;
+  const getDepartmentName = (emp: EmployeeOut) => {
+    if (emp.department_name?.trim()) return emp.department_name;
+    if (!emp.department_id) return '—';
+    return departments.find(d => d.id === emp.department_id)?.name || `Dept #${emp.department_id}`;
   };
 
   const removeFilter = (key: 'company_id' | 'department_id') => {
@@ -107,7 +108,7 @@ export function Employees() {
         emp.title.toLowerCase().includes(query) ||
         emp.mobile.toLowerCase().includes(query) ||
         (emp.address && emp.address.toLowerCase().includes(query)) ||
-        getDepartmentName(emp.department_id).toLowerCase().includes(query) ||
+        getDepartmentName(emp).toLowerCase().includes(query) ||
         (isAdmin && getCompanyName(emp.company_id).toLowerCase().includes(query)),
     );
   }, [employees, searchText, departments, companies, isAdmin]);
@@ -219,6 +220,7 @@ export function Employees() {
         setEmployees(prev =>
           [...prev, created].sort((a, b) => a.last_name.localeCompare(b.last_name)),
         );
+        toast.success(`Created ${created.full_name}.`);
       } else if (modal?.type === 'edit') {
         const updateData: EmployeeUpdate = {
           first_name: formData.first_name,
@@ -236,10 +238,11 @@ export function Employees() {
         if (!locked) updateData.role = (formData.role ?? modal.emp.role) as UserRole;
         const updated = await updateEmployee(modal.emp.id, updateData);
         setEmployees(prev => prev.map(e => (e.id === updated.id ? updated : e)));
+        toast.success(`Updated ${updated.full_name}.`);
       }
       setModal(null);
     } catch (err) {
-      setFormError(apiError(err));
+      toast.error(apiError(err));
     } finally {
       setSaving(false);
     }
@@ -249,12 +252,14 @@ export function Employees() {
     if (!confirmDelete) return;
     setDeleting(true);
     try {
+      const name = confirmDelete.full_name;
       await deleteEmployee(confirmDelete.id);
       setEmployees(prev => prev.filter(e => e.id !== confirmDelete.id));
       setConfirmDelete(null);
+      toast.success(`Removed ${name}.`);
     } catch (err) {
       setConfirmDelete(null);
-      setError(apiError(err));
+      toast.error(apiError(err));
     } finally {
       setDeleting(false);
     }
@@ -284,8 +289,6 @@ export function Employees() {
         }}
         onNewEmployee={openCreate}
       />
-
-      {error && <p className="text-sm text-red-500 mb-4">{error}</p>}
 
       <EmployeesTable
         loading={loading}

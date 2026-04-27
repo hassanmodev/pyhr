@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Navigate } from 'react-router-dom';
 import { Building2, Users, LayoutGrid } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,7 +11,7 @@ export function Dashboard() {
   const { user } = useAuth();
   const [companies, setCompanies] = useState<CompanyOut[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     if (user?.role === 'employee') {
@@ -18,8 +19,14 @@ export function Dashboard() {
       return;
     }
     getCompanies()
-      .then(setCompanies)
-      .catch(() => setError('Failed to load data.'))
+      .then(c => {
+        setCompanies(c);
+        setLoadFailed(false);
+      })
+      .catch(() => {
+        setLoadFailed(true);
+        toast.error('Failed to load dashboard data.');
+      })
       .finally(() => setLoading(false));
   }, [user?.role]);
 
@@ -45,8 +52,8 @@ export function Dashboard() {
         <div className="flex items-center gap-2 text-text-muted text-sm">
           <Spinner className="w-4 h-4" /> Loading…
         </div>
-      ) : error ? (
-        <p className="text-sm text-red-500">{error}</p>
+      ) : loadFailed ? (
+        <p className="text-sm text-text-muted">Stats unavailable. Check your connection and try again.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <StatCard

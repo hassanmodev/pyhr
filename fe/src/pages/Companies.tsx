@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { toast } from 'sonner';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Plus, Pencil, Trash2, Building2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -21,7 +22,6 @@ export function Companies() {
   const navigate = useNavigate();
   const [companies, setCompanies] = useState<CompanyOut[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   const [modal, setModal] = useState<ModalMode>(null);
   const [nameInput, setNameInput] = useState('');
@@ -38,7 +38,7 @@ export function Companies() {
     }
     getCompanies()
       .then(setCompanies)
-      .catch(() => setError('Failed to load companies.'))
+      .catch(() => toast.error('Failed to load companies.'))
       .finally(() => setLoading(false));
   }, [user?.role]);
 
@@ -56,13 +56,15 @@ export function Companies() {
       if (modal?.type === 'create') {
         const created = await createCompany(name);
         setCompanies(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+        toast.success(`Created "${created.name}".`);
       } else if (modal?.type === 'edit') {
         const updated = await updateCompany(modal.company.id, name);
         setCompanies(prev => prev.map(c => c.id === updated.id ? updated : c));
+        toast.success('Company updated.');
       }
       setModal(null);
     } catch (err) {
-      setFormError(apiError(err));
+      toast.error(apiError(err));
     } finally {
       setSaving(false);
     }
@@ -72,12 +74,14 @@ export function Companies() {
     if (!confirmDelete) return;
     setDeleting(true);
     try {
+      const n = confirmDelete.name;
       await deleteCompany(confirmDelete.id);
       setCompanies(prev => prev.filter(c => c.id !== confirmDelete.id));
       setConfirmDelete(null);
+      toast.success(`Deleted "${n}".`);
     } catch (err) {
       setConfirmDelete(null);
-      setError(apiError(err));
+      toast.error(apiError(err));
     } finally {
       setDeleting(false);
     }
@@ -103,11 +107,6 @@ export function Companies() {
           New company
         </button>
       </div>
-
-      {/* Error banner */}
-      {error && (
-        <p className="text-sm text-red-500 mb-4">{error}</p>
-      )}
 
       {/* List */}
       {loading ? (
@@ -220,7 +219,9 @@ export function Companies() {
             Delete <strong className="text-text-main">{confirmDelete.name}</strong>? This cannot be undone.
             {confirmDelete.total_employees > 0 && (
               <span className="block mt-1 text-red-500 text-xs">
-                This company has {confirmDelete.total_employees} active employee(s). Reassign them first.
+                {confirmDelete.total_employees} active employee(s) in the list above. Deletion is blocked
+                while any employee remains on this company—including inactive, who are not included in
+                that count. Reassign or remove everyone first.
               </span>
             )}
           </p>

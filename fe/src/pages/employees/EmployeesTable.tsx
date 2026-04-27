@@ -10,7 +10,7 @@ type Props = {
   filteredEmployees: EmployeeOut[];
   isAdmin: boolean;
   getCompanyName: (id: number | null) => string;
-  getDepartmentName: (id: number | null) => string;
+  getDepartmentName: (emp: EmployeeOut) => string;
   onNavigateCompanyFilter: (companyId: number) => void;
   onEdit: (emp: EmployeeOut) => void;
   onDelete: (emp: EmployeeOut) => void;
@@ -110,7 +110,7 @@ export function EmployeesTable({
                   )}
                 </td>
               )}
-              <td className="px-4 py-3 text-text-muted">{getDepartmentName(emp.department_id)}</td>
+              <td className="px-4 py-3 text-text-muted">{getDepartmentName(emp)}</td>
               <td className="px-4 py-3">
                 <StatusBadge status={emp.status} />
               </td>
