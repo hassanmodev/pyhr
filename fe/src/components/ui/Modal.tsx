@@ -5,9 +5,16 @@ interface ModalProps {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  /** Wider panel + padding for dense forms (default: compact dialogs). */
+  size?: 'sm' | 'lg';
 }
 
-export function Modal({ title, onClose, children }: ModalProps) {
+const panelBySize: Record<NonNullable<ModalProps['size']>, string> = {
+  sm: 'max-w-sm p-6',
+  lg: 'max-w-lg p-7',
+};
+
+export function Modal({ title, onClose, children, size = 'sm' }: ModalProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', onKey);
@@ -20,7 +27,7 @@ export function Modal({ title, onClose, children }: ModalProps) {
       onClick={onClose}
     >
       <div
-        className="bg-surface border border-border rounded-xl shadow-lg w-full max-w-sm p-6"
+        className={`bg-surface border border-border rounded-xl shadow-lg w-full ${panelBySize[size]}`}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-5">

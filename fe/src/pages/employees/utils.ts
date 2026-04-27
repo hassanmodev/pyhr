@@ -5,10 +5,7 @@ export type ModalMode =
   | { type: 'edit'; emp: EmployeeOut }
   | null;
 
-export function apiError(err: unknown) {
-  const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
-  return typeof detail === 'string' ? detail : 'Something went wrong.';
-}
+export { apiError } from '../../lib/apiError';
 
 export const todayStr = () => new Date().toISOString().split('T')[0];
 

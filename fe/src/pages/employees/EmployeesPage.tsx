@@ -18,12 +18,9 @@ import { EmployeesHeader } from './EmployeesHeader';
 import { EmployeesTable } from './EmployeesTable';
 import { EmployeeFormModal } from './EmployeeFormModal';
 import { EmployeeDeleteModal } from './EmployeeDeleteModal';
-import {
-  apiError,
-  assignableRoles,
-  todayStr,
-  type ModalMode,
-} from './utils';
+import { zodFirstError } from '../../lib/validation/fields';
+import { employeeCreateFormSchema, employeeUpdateFormSchema } from '../../lib/validation/employee';
+import { assignableRoles, todayStr, type ModalMode, apiError } from './utils';
 
 export function Employees() {
   const { user } = useAuth();
@@ -162,51 +159,49 @@ export function Employees() {
 
   const handleSave = async (e: FormEvent) => {
     e.preventDefault();
-    const firstName = formData.first_name?.trim();
-    const lastName = formData.last_name?.trim();
-    const email = formData.email?.trim();
-    const mobile = formData.mobile?.trim();
-    const title = formData.title?.trim();
-    const hireDate = formData.hire_date;
-    const companyId = formData.company_id;
-    const password = formData.password;
-
-    if (!firstName) {
-      setFormError('First name is required.');
-      return;
-    }
-    if (!lastName) {
-      setFormError('Last name is required.');
-      return;
-    }
-    if (!email) {
-      setFormError('Email is required.');
-      return;
-    }
-    if (!mobile) {
-      setFormError('Mobile is required.');
-      return;
-    }
-    if (!title) {
-      setFormError('Title is required.');
-      return;
-    }
-    if (!hireDate) {
-      setFormError('Hire date is required.');
-      return;
-    }
-    if (!companyId) {
-      setFormError('Company is required.');
-      return;
-    }
-    if (modal?.type === 'create' && !password) {
-      setFormError('Password is required for new employees.');
-      return;
-    }
     const role = formData.role as UserRole | undefined;
     if (role && !rolesForMe.includes(role)) {
       setFormError('You cannot assign that role.');
       return;
+    }
+
+    if (modal?.type === 'create') {
+      const parsed = employeeCreateFormSchema.safeParse({
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        email: formData.email,
+        mobile: formData.mobile,
+        address: formData.address,
+        title: formData.title,
+        hire_date: formData.hire_date,
+        status: formData.status ?? 'active',
+        department_id: formData.department_id,
+        company_id: formData.company_id,
+        password: formData.password,
+        role: formData.role ?? 'employee',
+      });
+      if (!parsed.success) {
+        setFormError(zodFirstError(parsed.error));
+        return;
+      }
+    } else if (modal?.type === 'edit') {
+      const parsed = employeeUpdateFormSchema.safeParse({
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        email: formData.email,
+        mobile: formData.mobile,
+        address: formData.address,
+        title: formData.title,
+        hire_date: formData.hire_date,
+        status: formData.status ?? 'active',
+        department_id: formData.department_id,
+        company_id: formData.company_id,
+        role: formData.role ?? modal.emp.role,
+      });
+      if (!parsed.success) {
+        setFormError(zodFirstError(parsed.error));
+        return;
+      }
     }
 
     setSaving(true);
