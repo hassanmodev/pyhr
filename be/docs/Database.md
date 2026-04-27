@@ -1,6 +1,6 @@
 # Database
 
-PostgreSQL backs the API via **SQLAlchemy 2** and the **psycopg** driver. ORM models live under `be/src/models/`.
+PostgreSQL backs the API via **SQLAlchemy 2** and the **psycopg** driver. ORM models live under `be/src/models/`. The web framework is **Flask** (served via `flask run`; Swagger UI at `/apidocs`).
 
 ## Configuration
 
@@ -20,7 +20,7 @@ The engine uses `pool_pre_ping=True` so stale connections are detected before us
 
 | Step | What happens |
 |------|----------------|
-| API startup | `Base.metadata.create_all(bind=engine)` runs in the FastAPI lifespan (`be/src/main.py`). Creates missing tables; **does not** alter or drop existing columns. |
+| API startup | `Base.metadata.create_all(bind=engine)` runs inside the Flask `create_app()` app context (`be/src/main.py`). Creates missing tables; **does not** alter or drop existing columns. |
 | Seed | `python -m src.seed` from `be/` (or `docker compose exec api python -m src.seed`). Ensures tables exist, then inserts demo data idempotently. |
 | Wipe data | `python -m src.seed --reset` deletes all rows in `employees`, `departments`, `companies` (in that order), then re-seeds. Schema objects remain. |
 
