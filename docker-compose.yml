@@ -18,7 +18,7 @@ services:
     build: ./be
     ports:
       - "8000:8000"
-    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    command: flask --app src.main:app run --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./be/src:/app/src
     env_file:

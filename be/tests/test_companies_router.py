@@ -8,7 +8,7 @@ class TestListCompanies:
         """Admin sees all companies with counts."""
         response = client.get("/companies/", headers=auth_headers(admin_token))
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert isinstance(data, list)
         assert len(data) >= 1
         # Check response structure
@@ -25,7 +25,7 @@ class TestListCompanies:
         """HR manager sees only their assigned company."""
         response = client.get("/companies/", headers=auth_headers(hr_token))
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert isinstance(data, list)
         assert len(data) == 1
         assert data[0]["name"] == sample_company.name
@@ -45,7 +45,7 @@ class TestCreateCompany:
             json={"name": "New Company"},
         )
         assert response.status_code == 201
-        data = response.json()
+        data = response.get_json()
         assert data["name"] == "New Company"
         assert "id" in data
         assert data["total_departments"] == 0
@@ -78,7 +78,7 @@ class TestGetCompany:
             headers=auth_headers(admin_token),
         )
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["id"] == sample_company.id
         assert data["name"] == sample_company.name
         assert "total_departments" in data
@@ -102,7 +102,7 @@ class TestUpdateCompany:
             json={"name": "Updated Name"},
         )
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["name"] == "Updated Name"
         assert data["id"] == sample_company.id
 
@@ -114,7 +114,7 @@ class TestUpdateCompany:
             headers=auth_headers(admin_token),
             json={"name": "Another Company"},
         )
-        another_id = resp.json()["id"]
+        another_id = resp.get_json()["id"]
 
         # Try to update to existing name
         response = client.patch(
@@ -134,7 +134,7 @@ class TestDeleteCompany:
             headers=auth_headers(admin_token),
             json={"name": "To Delete"},
         )
-        company_id = resp.json()["id"]
+        company_id = resp.get_json()["id"]
 
         response = client.delete(
             f"/companies/{company_id}",

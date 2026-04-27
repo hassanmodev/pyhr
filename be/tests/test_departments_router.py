@@ -8,7 +8,7 @@ class TestListDepartments:
         """Admin sees all departments with counts."""
         response = client.get("/departments/", headers=auth_headers(admin_token))
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert isinstance(data, list)
         # Check response structure
         if data:
@@ -27,7 +27,7 @@ class TestListDepartments:
             headers=auth_headers(admin_token),
         )
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert isinstance(data, list)
         for dept in data:
             assert dept["company_id"] == sample_company.id
@@ -42,7 +42,7 @@ class TestCreateDepartment:
             json={"name": "New Department", "company_id": sample_company.id},
         )
         assert response.status_code == 201
-        data = response.json()
+        data = response.get_json()
         assert data["name"] == "New Department"
         assert data["company_id"] == sample_company.id
         assert "id" in data
@@ -84,7 +84,7 @@ class TestGetDepartment:
             headers=auth_headers(admin_token),
         )
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["id"] == sample_department.id
         assert data["name"] == sample_department.name
         assert "active_employee_count" in data
@@ -107,7 +107,7 @@ class TestUpdateDepartment:
             json={"name": "Updated Department"},
         )
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["name"] == "Updated Department"
 
 class TestDeleteDepartment:
@@ -119,7 +119,7 @@ class TestDeleteDepartment:
             headers=auth_headers(admin_token),
             json={"name": "To Delete", "company_id": sample_company.id},
         )
-        dept_id = resp.json()["id"]
+        dept_id = resp.get_json()["id"]
 
         response = client.delete(
             f"/departments/{dept_id}",

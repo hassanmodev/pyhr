@@ -1,10 +1,9 @@
-"""Pytest fixtures and configuration."""
+"""Pytest fixtures and configuration for Flask."""
 
 import os
 from datetime import date
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -16,8 +15,12 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 # Import and monkey-patch the database before importing the app
 from src import database
-from sqlalchemy import create_engine
-from sqlalchemy.pool import StaticPool
+from src.models import Base
+from src.models.company import Company
+from src.models.department import Department
+from src.models.employee import Employee, EmployeeStatus
+from src.models.user import UserRole
+from src.core.security import hash_password
 
 # Create in-memory SQLite database for testing
 _test_engine = create_engine(
@@ -32,14 +35,7 @@ database.engine = _test_engine
 database.SessionLocal = _test_session_local
 
 # Now we can import the app
-from src.database import get_db
-from src.main import app
-from src.models import Base
-from src.models.company import Company
-from src.models.department import Department
-from src.models.employee import Employee, EmployeeStatus
-from src.models.user import UserRole
-from src.core.security import hash_password
+from src.main import create_app
 
 
 @pytest.fixture(scope="function")
@@ -55,18 +51,20 @@ def db():
 
 
 @pytest.fixture(scope="function")
-def client(db):
-    """Create a test client with overridden database dependency."""
-    def override_get_db():
-        try:
-            yield db
-        finally:
-            pass
+def app(db):
+    """Create a Flask app with test configuration."""
+    flask_app = create_app()
+    flask_app.config["TESTING"] = True
+    yield flask_app
 
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as test_client:
+
+@pytest.fixture(scope="function")
+def client(app, db):
+    """Create a test client."""
+    # Store db in app context for access during tests
+    app.test_db = db
+    with app.test_client() as test_client:
         yield test_client
-    app.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -163,8 +161,8 @@ def admin_token(admin_user, client):
         "/auth/login",
         json={"email": "admin@test.com", "password": "admin1234"},
     )
-    assert response.status_code == 200, f"Admin login failed: {response.text}"
-    return response.json()["access_token"]
+    assert response.status_code == 200, f"Admin login failed: {response.get_json()}"
+    return response.get_json()["access_token"]
 
 
 @pytest.fixture
@@ -174,8 +172,8 @@ def hr_token(hr_user, client):
         "/auth/login",
         json={"email": "hr@test.com", "password": "hr1234"},
     )
-    assert response.status_code == 200, f"HR login failed: {response.text}"
-    return response.json()["access_token"]
+    assert response.status_code == 200, f"HR login failed: {response.get_json()}"
+    return response.get_json()["access_token"]
 
 
 @pytest.fixture
@@ -185,8 +183,8 @@ def employee_token(employee_user, client):
         "/auth/login",
         json={"email": "john@test.com", "password": "employee1234"},
     )
-    assert response.status_code == 200, f"Employee login failed: {response.text}"
-    return response.json()["access_token"]
+    assert response.status_code == 200, f"Employee login failed: {response.get_json()}"
+    return response.get_json()["access_token"]
 
 
 def auth_headers(token: str) -> dict:

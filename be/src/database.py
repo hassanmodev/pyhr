@@ -25,7 +25,9 @@ def _database_url() -> str:
 
 DATABASE_URL = _database_url()
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+engine = create_engine(
+    DATABASE_URL, pool_pre_ping=True, pool_size=20
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

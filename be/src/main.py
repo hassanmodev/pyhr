@@ -1,23 +1,12 @@
-from contextlib import asynccontextmanager
+from flask import Flask, jsonify
+from flask_cors import CORS
+from flasgger import Swagger
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
+from src.database import engine
+from src.models import Base
 from src.routers import auth, companies, departments, employees
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    from src.database import engine
-    from src.models import Base
-    Base.metadata.create_all(bind=engine)
-    yield
-
-
-app = FastAPI(
-    lifespan=lifespan,
-    title="pyhr API",
-    description="""
+API_DESCRIPTION = """
 ## Employee Management System API
 
 A RESTful API for managing companies, departments, and employees with role-based access control.
@@ -39,9 +28,16 @@ Authorization: Bearer <token>
 ```
 
 Obtain a token via **POST /auth/login**.
-""",
-    version="1.0.0",
-    openapi_tags=[
+"""
+
+SWAGGER_TEMPLATE = {
+    "swagger": "2.0",
+    "info": {
+        "title": "pyhr API",
+        "description": API_DESCRIPTION,
+        "version": "1.0.0",
+    },
+    "tags": [
         {
             "name": "auth",
             "description": "Login and retrieve the current authenticated user.",
@@ -64,23 +60,84 @@ Obtain a token via **POST /auth/login**.
             "Each person is one `employees` row (profile + login credentials). "
             "Each response includes auto-calculated `days_employed`.",
         },
+        {
+            "name": "health",
+            "description": "Service health check.",
+        },
     ],
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(auth.router)
-app.include_router(companies.router)
-app.include_router(departments.router)
-app.include_router(employees.router)
+    "securityDefinitions": {
+        "Bearer": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header",
+            "description": "JWT access token: `Bearer <token>`",
+        }
+    },
+}
 
 
-@app.get("/health", tags=["health"], summary="Health check")
-def health():
-    return {"status": "ok"}
+def create_app() -> Flask:
+    app = Flask(__name__)
+
+    CORS(app, origins=["http://localhost:3000", "http://localhost:5173"], supports_credentials=True)
+
+    Swagger(app, template=SWAGGER_TEMPLATE, merge=True)
+
+    with app.app_context():
+        Base.metadata.create_all(bind=engine)
+
+    app.register_blueprint(auth.bp, url_prefix="/auth")
+    app.register_blueprint(companies.bp, url_prefix="/companies")
+    app.register_blueprint(departments.bp, url_prefix="/departments")
+    app.register_blueprint(employees.bp, url_prefix="/employees")
+
+    @app.route("/health", methods=["GET"])
+    def health():
+        """Health check
+        ---
+        tags:
+          - health
+        summary: Health check
+        responses:
+          200:
+            description: OK
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: ok
+        """
+        return jsonify({"status": "ok"})
+
+    @app.errorhandler(400)
+    def bad_request(error):
+        return jsonify({"detail": str(error.description)}), 400
+
+    @app.errorhandler(401)
+    def unauthorized(error):
+        return jsonify({"detail": str(error.description)}), 401
+
+    @app.errorhandler(403)
+    def forbidden(error):
+        return jsonify({"detail": str(error.description)}), 403
+
+    @app.errorhandler(404)
+    def not_found(error):
+        return jsonify({"detail": str(error.description)}), 404
+
+    @app.errorhandler(409)
+    def conflict(error):
+        return jsonify({"detail": str(error.description)}), 409
+
+    @app.errorhandler(422)
+    def unprocessable(error):
+        return jsonify({"detail": str(error.description)}), 422
+
+    return app
+
+
+app = create_app()
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8000, debug=True)

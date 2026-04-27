@@ -1,31 +1,56 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from flask import Blueprint, abort, g, jsonify, request
 from sqlalchemy.orm import Session
 
-from src.core.deps import get_current_user
+from src.core.deps import get_current_user, get_db
 from src.core.security import create_access_token, verify_password
-from src.database import get_db
-from src.models.employee import Employee
-from src.schemas.auth import LoginRequest, TokenResponse, UserOut
+from src.core.validation import validate_email
+from src.models.employee import Employee, EmployeeStatus
+from src.models.user import UserRole
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+bp = Blueprint("auth", __name__)
 
 
-@router.post("/login", response_model=TokenResponse)
-def login(body: LoginRequest, db: Session = Depends(get_db)):
-    emp = db.query(Employee).filter(Employee.email == body.email).first()
-    if not emp or not verify_password(body.password, emp.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-    if not emp.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
+@bp.route("/login", methods=["POST"])
+def login():
+    """Authenticate and receive JWT token."""
+    data = request.get_json()
+    if not data or "email" not in data or "password" not in data:
+        abort(422, "Email and password are required")
+
+    email = data["email"]
+    password = data["password"]
+
+    try:
+        email = validate_email(email)
+    except ValueError as e:
+        abort(422, str(e))
+
+    db = get_db()
+    emp = db.query(Employee).filter(Employee.email == email).first()
+
+    if not emp or not verify_password(password, emp.password_hash):
+        abort(401, "Invalid credentials")
+
+    # Fix: Check both is_active AND status - inactive employees cannot login
+    if not emp.is_active or emp.status == EmployeeStatus.INACTIVE:
+        abort(403, "Account disabled")
 
     token = create_access_token(
         user_id=emp.id,
         role=emp.role.value,
         company_id=emp.company_id,
     )
-    return TokenResponse(access_token=token)
+    return jsonify({"access_token": token, "token_type": "bearer"})
 
 
-@router.get("/me", response_model=UserOut)
-def me(current_user: Employee = Depends(get_current_user)):
-    return current_user
+@bp.route("/me", methods=["GET"])
+def me():
+    """Get current authenticated user profile."""
+    current_user = get_current_user()
+    return jsonify({
+        "id": current_user.id,
+        "email": current_user.email,
+        "role": current_user.role.value,
+        "company_id": current_user.company_id,
+        "is_active": current_user.is_active,
+    })

@@ -1,6 +1,7 @@
 """Tests for employees router - focused on response structures and permissions."""
 
 from conftest import auth_headers
+from src.models.employee import Employee
 
 
 class TestGetMyProfile:
@@ -8,13 +9,14 @@ class TestGetMyProfile:
         """Employee can get their own profile with computed fields."""
         response = client.get("/employees/me", headers=auth_headers(employee_token))
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         # Check response structure
         assert data["id"] == employee_user.id
         assert data["email"] == employee_user.email
         assert "full_name" in data
         assert "days_employed" in data
         assert "company_name" in data
+        assert "department_name" in data  # New field per feedback
         assert isinstance(data["days_employed"], int)
         assert data["full_name"] == f"{employee_user.first_name} {employee_user.last_name}"
 
@@ -24,7 +26,7 @@ class TestListEmployees:
         """Admin sees all employees."""
         response = client.get("/employees/", headers=auth_headers(admin_token))
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert isinstance(data, list)
         assert len(data) >= 1
         # Check response structure
@@ -35,12 +37,13 @@ class TestListEmployees:
         assert "full_name" in emp
         assert "email" in emp
         assert "days_employed" in emp
+        assert "department_name" in emp  # New field per feedback
 
     def test_hr_sees_own_company_employees(self, client, hr_token, employee_user):
         """HR manager sees only their company's employees."""
         response = client.get("/employees/", headers=auth_headers(hr_token))
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert isinstance(data, list)
         # All returned employees should belong to HR's company
         for emp in data:
@@ -62,18 +65,19 @@ class TestCreateEmployee:
                 "hire_date": "2023-01-01",
                 "company_id": sample_company.id,
                 "department_id": sample_department.id,
-                "password": "password123",
+                "password": "Password123",
                 "role": "employee",
             },
         )
         assert response.status_code == 201
-        data = response.json()
+        data = response.get_json()
         assert data["first_name"] == "Jane"
         assert data["last_name"] == "Smith"
         assert data["email"] == "jane@test.com"
         assert "full_name" in data
         assert "days_employed" in data
         assert data["company_id"] == sample_company.id
+        assert "department_name" in data  # New field per feedback
 
     def test_duplicate_email_fails(self, client, admin_token, sample_company, employee_user):
         """Creating employee with duplicate email returns 409."""
@@ -88,7 +92,7 @@ class TestCreateEmployee:
                 "title": "Tester",
                 "hire_date": "2023-01-01",
                 "company_id": sample_company.id,
-                "password": "password123",
+                "password": "Password123",
                 "role": "employee",
             },
         )
@@ -107,7 +111,7 @@ class TestCreateEmployee:
                 "title": "Hacker",
                 "hire_date": "2023-01-01",
                 "company_id": sample_company.id,
-                "password": "password123",
+                "password": "Password123",
                 "role": "system_admin",  # HR cannot assign this
             },
         )
@@ -122,9 +126,10 @@ class TestGetEmployee:
             headers=auth_headers(admin_token),
         )
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["id"] == employee_user.id
         assert data["email"] == employee_user.email
+        assert "department_name" in data  # New field per feedback
 
     def test_not_found_returns_404(self, client, admin_token):
         """Getting non-existent employee returns 404."""
@@ -144,7 +149,7 @@ class TestUpdateEmployee:
             json={"first_name": "Updated Name"},
         )
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["first_name"] == "Updated Name"
         assert data["full_name"] == "Updated Name Doe"
 
@@ -174,14 +179,31 @@ class TestDeleteEmployee:
                 "hire_date": "2023-01-01",
                 "company_id": sample_company.id,
                 "department_id": sample_department.id,
-                "password": "password123",
+                "password": "Password123",
                 "role": "employee",
             },
         )
-        emp_id = resp.json()["id"]
+        emp_id = resp.get_json()["id"]
 
         response = client.delete(
             f"/employees/{emp_id}",
             headers=auth_headers(admin_token),
         )
         assert response.status_code == 204
+
+
+class TestLoginWithInactiveStatus:
+    def test_inactive_employee_cannot_login(self, client, employee_user, db):
+        """Employees with status=INACTIVE cannot login even if is_active=True."""
+        from src.models.employee import EmployeeStatus
+
+        # Set employee to inactive status but keep is_active=True
+        emp = db.get(Employee, employee_user.id)
+        emp.status = EmployeeStatus.INACTIVE
+        db.commit()
+
+        response = client.post(
+            "/auth/login",
+            json={"email": employee_user.email, "password": "employee1234"},
+        )
+        assert response.status_code == 403
